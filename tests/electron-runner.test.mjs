@@ -15,3 +15,9 @@ test('maps JSON runner output to a passed result', () => {
 test('maps malformed failing output to a failed result', () => {
   assert.equal(parseRunnerOutput('Assertion failed', 1).status, 'failed');
 });
+
+test('keeps the generated spec path relative to the project root', () => {
+  const result = buildRunCommand('/project', '.playwright-studio/runs/run-1/test.spec.ts');
+  assert.equal(result.cwd, '/project');
+  assert.equal(result.args[2], '.playwright-studio/runs/run-1/test.spec.ts');
+});

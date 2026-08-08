@@ -1,6 +1,5 @@
 const { spawn } = require('node:child_process');
 const fs = require('node:fs/promises');
-const os = require('node:os');
 const path = require('node:path');
 
 let activeProcess = null;
@@ -38,11 +37,11 @@ async function listArtifacts(directory) {
 async function runGeneratedTest(request) {
   if (!request || typeof request.source !== 'string' || !request.source.trim()) throw new Error('Test source is required.');
   const projectPath = path.resolve(String(request.projectPath || process.cwd()));
-  const runRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-studio-run-'));
+  const runRoot = await fs.mkdtemp(path.join(projectPath, '.playwright-studio', 'runs', 'run-'));
   const specFile = `${String(request.testId || 'test').replace(/[^a-z0-9-_]/gi, '-') || 'test'}.spec.ts`;
   const specPath = path.join(runRoot, specFile);
   await fs.writeFile(specPath, request.source, 'utf8');
-  const command = buildRunCommand(projectPath, specPath);
+  const command = buildRunCommand(projectPath, path.relative(projectPath, specPath));
   const startedAt = Date.now();
   const env = { ...process.env, ...(request.environment || {}) };
   if (request.baseURL) env.PLAYWRIGHT_STUDIO_BASE_URL = request.baseURL;
