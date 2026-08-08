@@ -14,27 +14,36 @@
     "package": "electron-builder --mac --win"
   },
   "dependencies": {
+    "playwright": "latest",
     "react": "latest",
-    "react-dom": "latest",
-    "playwright": "latest"
+    "react-dom": "latest"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "latest",
-    "electron": "latest",
-    "electron-builder": "latest",
-    "vite": "latest",
-    "typescript": "latest",
-    "concurrently": "latest",
-    "wait-on": "latest",
+    "@playwright/test": "^1.62.1",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "tsx": "latest"
+    "@vitejs/plugin-react": "latest",
+    "concurrently": "latest",
+    "electron": "latest",
+    "electron-builder": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "wait-on": "latest"
   },
   "build": {
     "appId": "com.playwrightstudio.app",
     "productName": "Playwright Studio",
-    "files": ["dist/**/*", "electron/**/*", "package.json"],
-    "mac": { "target": "dmg" },
-    "win": { "target": "nsis" }
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    }
   }
 }
