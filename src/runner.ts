@@ -1,6 +1,7 @@
 export type RunStatus = 'idle' | 'queued' | 'running' | 'passed' | 'failed' | 'stopped';
 export type RunArtifact = { kind: 'screenshot' | 'trace' | 'video'; path: string };
 export type RunRequest = { testId: string; source: string; projectPath?: string; testDir?: string; baseURL?: string; environment?: Record<string, string>; headed?: boolean };
+export type RunFailure = { title: string; message: string; location?: { file: string; line?: number; column?: number } };
 export type RunReport = {
   file: string;
   total: number;
@@ -8,6 +9,7 @@ export type RunReport = {
   failed: number;
   skipped: number;
   errorLocation?: { file: string; line?: number; column?: number };
+  failures?: RunFailure[];
 };
 export type RunResult = {
   status: Exclude<RunStatus, 'idle' | 'queued' | 'running'>;
@@ -44,7 +46,60 @@ function location(value: unknown): RunReport['errorLocation'] {
 
 function errorMessage(value: unknown): string {
   const candidate = asRecord(value);
-  return typeof value === 'string' ? value : typeof candidate?.message === 'string' ? candidate.message : '';
+  if (typeof value === 'string') return value;
+  if (typeof candidate?.message === 'string' && candidate.message) return candidate.message;
+  const nested = asRecord(candidate?.error);
+  return typeof nested?.message === 'string' ? nested.message : '';
+}
+
+function failureTitle(spec: Record<string, unknown>, test: Record<string, unknown>, file: string): string {
+  for (const value of [test.title, spec.title, file]) {
+    if (typeof value === 'string' && value) return value;
+  }
+  return 'Unknown step';
+}
+
+function specFailures(spec: Record<string, unknown>): RunFailure[] {
+  const file = typeof spec.file === 'string' ? spec.file : '';
+  if (!Array.isArray(spec.tests)) return [];
+  const failures: RunFailure[] = [];
+  for (const value of spec.tests) {
+    const test = asRecord(value);
+    if (!test || !Array.isArray(test.results)) continue;
+    for (const resultValue of test.results) {
+      const result = asRecord(resultValue);
+      if (!result || !Array.isArray(result.errors)) continue;
+      for (const errorValue of result.errors) {
+        const message = errorMessage(errorValue);
+        if (!message.trim()) continue;
+        const error = asRecord(errorValue);
+        const errorLocation = location(error?.location);
+        failures.push({
+          title: failureTitle(spec, test, file),
+          message,
+          ...(errorLocation ? { location: errorLocation } : {})
+        });
+      }
+    }
+  }
+  return failures;
+}
+
+function suiteFailures(suites: unknown): RunFailure[] {
+  const pending = Array.isArray(suites) ? [...suites] : [];
+  const failures: RunFailure[] = [];
+  while (pending.length) {
+    const suite = asRecord(pending.shift());
+    if (!suite) continue;
+    if (Array.isArray(suite.specs)) {
+      for (const specValue of suite.specs) {
+        const spec = asRecord(specValue);
+        if (spec) failures.push(...specFailures(spec));
+      }
+    }
+    if (Array.isArray(suite.suites)) pending.push(...suite.suites);
+  }
+  return failures;
 }
 
 function firstSpec(suites: unknown): Record<string, unknown> | undefined {
@@ -146,6 +201,7 @@ export function normalizeRunResult(payload: unknown): RunResult {
   const skipped = reportTotal === undefined ? 0 : skippedCount;
   const spec = firstSpec(value.suites);
   const errorLocation = status === 'failed' ? location(topLevelError?.location) ?? suiteErrorLocation(value.suites) : undefined;
+  const failures = status === 'failed' ? suiteFailures(value.suites) : undefined;
   return {
     status,
     durationMs: typeof value.durationMs === 'number' && Number.isFinite(value.durationMs) ? value.durationMs : 0,
@@ -159,7 +215,8 @@ export function normalizeRunResult(payload: unknown): RunResult {
       passed,
       failed,
       skipped,
-      ...(errorLocation ? { errorLocation } : {})
+      ...(errorLocation ? { errorLocation } : {}),
+      ...(failures?.length ? { failures } : {})
     }
   };
 }

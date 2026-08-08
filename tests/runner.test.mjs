@@ -69,6 +69,42 @@ test('normalizes nested Playwright errors and failed-only locations', () => {
   assert.equal(passed.report.errorLocation, undefined);
 });
 
+test('normalizes failed test details in report order', () => {
+  const result = normalizeRunResult({
+    status: 'failed',
+    suites: [{ specs: [{ file: 'tests/login.spec.ts', title: 'login', tests: [
+      { title: 'valid credentials', results: [{ errors: [{ message: 'Expected dashboard', location: { file: 'tests/login.spec.ts', line: 12, column: 5 } }] }] },
+      { title: 'invalid password', results: [{ errors: [{ message: 'Expected error message' }] }] }
+    ] }] }]
+  });
+  assert.deepEqual(result.report.failures, [
+    { title: 'valid credentials', message: 'Expected dashboard', location: { file: 'tests/login.spec.ts', line: 12, column: 5 } },
+    { title: 'invalid password', message: 'Expected error message' }
+  ]);
+});
+
+test('normalizes nested failure messages and ignores malformed errors', () => {
+  const result = normalizeRunResult({
+    status: 'failed',
+    suites: [null, {}, { specs: [{ file: 'tests/a.spec.ts', tests: [
+      { results: [{ errors: [null, {}, { error: { message: 'Useful inner message' }, location: { file: '' } }, { message: '   ' }] }] },
+      { results: 'malformed' }
+    ] }] }, { suites: [{ specs: [{ title: 'nested spec', tests: [{ title: '', results: [{ errors: [{ message: 'Nested failure' }] }] }] }] }] }]
+  });
+  assert.deepEqual(result.report.failures, [
+    { title: 'tests/a.spec.ts', message: 'Useful inner message' },
+    { title: 'nested spec', message: 'Nested failure' }
+  ]);
+});
+
+test('does not expose failures for stopped runs', () => {
+  const result = normalizeRunResult({
+    status: 'stopped',
+    suites: [{ specs: [{ title: 'stopped test', tests: [{ results: [{ errors: [{ message: 'Should not show' }] }] }] }] }]
+  });
+  assert.equal(result.report.failures, undefined);
+});
+
 test('drops invalid error location coordinates', () => {
   assert.deepEqual(normalizeRunResult({
     status: 'failed',
