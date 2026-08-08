@@ -33,7 +33,7 @@ async function countLocator(page, locatorType, selector, role) {
 
 const captureScript = `(() => {
   const emit = (event) => window.__pwStudioEmit && window.__pwStudioEmit(event);
-  const text = (node) => (node.innerText || node.getAttribute('aria-label') || '').trim().replace(/\\s+/g, ' ').slice(0, 100);
+  const text = (node) => (node.getAttribute('aria-label') || (node.tagName.toLowerCase() === 'select' ? '' : node.innerText) || '').trim().replace(/\\s+/g, ' ').slice(0, 100);
   const cssEscape = (value) => String(value).replace(/([\\\\"'#.:\\[\\]()>+~])/g, '\\\\$1');
   const locator = (node) => {
     const tag = node.tagName.toLowerCase();
