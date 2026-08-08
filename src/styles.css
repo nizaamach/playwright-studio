@@ -132,6 +132,7 @@ button:active { transform: translateY(1px); }
 .test-report-grid dd { margin: 5px 0 0; overflow: hidden; color: var(--text); font: 700 10px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; text-overflow: ellipsis; white-space: nowrap; }
 .test-report.failed .test-report-grid > div:nth-child(5) dd { color: var(--danger); }
 .test-report-file { grid-column: 1 / -1; }
+.test-report-file dd { overflow-wrap: anywhere; text-overflow: clip; white-space: normal; }
 .test-report-message { margin: 0; font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .test-report-message.success { color: var(--accent); }
 .test-report-message.failure { color: var(--danger); }
