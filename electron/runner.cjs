@@ -37,8 +37,11 @@ async function listArtifacts(directory) {
 async function runGeneratedTest(request) {
   if (!request || typeof request.source !== 'string' || !request.source.trim()) throw new Error('Test source is required.');
   const projectPath = path.resolve(String(request.projectPath || process.cwd()));
-  await fs.mkdir(path.join(projectPath, '.playwright-studio', 'runs'), { recursive: true });
-  const runRoot = await fs.mkdtemp(path.join(projectPath, '.playwright-studio', 'runs', 'run-'));
+  const testDir = typeof request.testDir === 'string' && request.testDir.trim() ? request.testDir : 'tests';
+  const runBase = path.resolve(projectPath, testDir, 'playwright-studio-runs');
+  if (!runBase.startsWith(`${projectPath}${path.sep}`)) throw new Error('Invalid test directory.');
+  await fs.mkdir(runBase, { recursive: true });
+  const runRoot = await fs.mkdtemp(path.join(runBase, 'run-'));
   const specFile = `${String(request.testId || 'test').replace(/[^a-z0-9-_]/gi, '-') || 'test'}.spec.ts`;
   const specPath = path.join(runRoot, specFile);
   await fs.writeFile(specPath, request.source, 'utf8');

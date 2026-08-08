@@ -17,7 +17,7 @@ test('maps malformed failing output to a failed result', () => {
 });
 
 test('keeps the generated spec path relative to the project root', () => {
-  const result = buildRunCommand('/project', '.playwright-studio/runs/run-1/test.spec.ts');
+  const result = buildRunCommand('/project', 'tests/playwright-studio-runs/run-1/test.spec.ts');
   assert.equal(result.cwd, '/project');
-  assert.equal(result.args[2], '.playwright-studio/runs/run-1/test.spec.ts');
+  assert.equal(result.args[2], 'tests/playwright-studio-runs/run-1/test.spec.ts');
 });
