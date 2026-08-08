@@ -27,3 +27,13 @@ test('can use the Studio Playwright binary without npx', () => {
   assert.equal(result.command, '/studio/node_modules/.bin/playwright');
   assert.deepEqual(result.args, ['test', 'tests/run/test.spec.ts', '--reporter=json']);
 });
+
+test('adds headed mode when requested', () => {
+  const result = buildRunCommand('/project', 'tests/run/test.spec.ts', '/studio/playwright', { headed: true });
+  assert.deepEqual(result.args, ['test', 'tests/run/test.spec.ts', '--reporter=json', '--headed']);
+});
+
+test('keeps runs headless when headed is not enabled', () => {
+  const result = buildRunCommand('/project', 'tests/run/test.spec.ts', '/studio/playwright', { headed: false });
+  assert.deepEqual(result.args, ['test', 'tests/run/test.spec.ts', '--reporter=json']);
+});
