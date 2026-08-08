@@ -8,7 +8,7 @@ const locator = (step: Step) => {
     case 'role': return `page.getByRole(${quote(step.role || 'button')}, { name: ${value} })`;
     case 'xpath': return `page.locator('xpath=' + ${value})`;
     case 'text': return `page.getByText(${value})`;
-    case 'label': return `page.getByLabel(${value})`;
+    case 'label': return `page.getByLabel(${value}, { exact: true })`;
     case 'testId': return `page.getByTestId(${value})`;
     case 'placeholder': return `page.getByPlaceholder(${value})`;
     default: return `page.locator(${value})`;

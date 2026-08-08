@@ -12,6 +12,7 @@ const steps = [
   { id: '2f', type: 'clear', selector: '#email' },
   { id: '2g', type: 'press', selector: '#email', value: 'Enter' },
   { id: '3', type: 'fill', selector: '#email', value: 'qa@example.com' },
+  { id: '3b', type: 'fill', locatorType: 'label', selector: 'Email', value: 'qa@example.com' },
   { id: '4', type: 'select', selector: '#role', value: 'qa' },
   { id: '5', type: 'check', selector: '#terms' },
   { id: '6', type: 'upload', selector: 'input[type=file]', value: 'fixture.txt' },
@@ -25,7 +26,7 @@ const steps = [
 
 test('generator produces valid Playwright statements for all MVP action types', () => {
   const output = generateCode('smoke flow', steps);
-  for (const expected of ['page.goto', '.click()', '.getByTestId("submit").click()', "page.locator('xpath=' +", '//button[@type=', '.hover()', '.focus()', '.clear()', '.press("Enter")', '.fill(', '.selectOption(', '.check()', '.setInputFiles(', 'toContainText(', '.toBeEnabled()', '.toHaveCount(3)', '.toHaveAttribute("aria-label", "Email")', 'waitForTimeout(250)', 'page.screenshot']) assert.match(output, new RegExp(expected.replace(/[()[\].]/g, '\\$&')));
+  for (const expected of ['page.goto', '.click()', '.getByTestId("submit").click()', "page.locator('xpath=' +", '//button[@type=', '.hover()', '.focus()', '.clear()', '.press("Enter")', '.fill(', '.selectOption(', '.check()', '.setInputFiles(', 'toContainText(', '.toBeEnabled()', '.toHaveCount(3)', '.toHaveAttribute("aria-label", "Email")', 'getByLabel("Email", { exact: true })', 'waitForTimeout(250)', 'page.screenshot']) assert.match(output, new RegExp(expected.replace(/[()[\].]/g, '\\$&')));
 });
 test('generated output imports Playwright test and expect', () => { assert.match(generateCode('test', []), /import \{ test, expect \} from '@playwright\/test'/); });
 test('generates visibility and checked assertions', () => {

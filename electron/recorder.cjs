@@ -17,7 +17,7 @@ async function countLocator(page, locatorType, selector, role) {
     const locator = locatorType === 'role'
       ? page.getByRole(role.trim(), { name: value })
       : locatorType === 'label'
-        ? page.getByLabel(value)
+        ? page.getByLabel(value, { exact: true })
         : locatorType === 'text'
           ? page.getByText(value)
           : locatorType === 'testId'
