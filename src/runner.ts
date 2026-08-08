@@ -90,7 +90,7 @@ function stepFailures(steps: unknown, fallbackTitle: string): RunFailure[] {
   return failures;
 }
 
-function specFailures(spec: Record<string, unknown>): RunFailure[] {
+function specFailures(spec: Record<string, unknown>, errorsFallback = true): RunFailure[] {
   const file = typeof spec.file === 'string' ? spec.file : '';
   if (!Array.isArray(spec.tests)) return [];
   const failures: RunFailure[] = [];
@@ -106,7 +106,7 @@ function specFailures(spec: Record<string, unknown>): RunFailure[] {
         failures.push(...steps);
         continue;
       }
-      if (!Array.isArray(result.errors)) continue;
+      if (!errorsFallback || !Array.isArray(result.errors)) continue;
       for (const errorValue of result.errors) {
         const detail = failureDetail(errorValue);
         if (detail) failures.push({ title, ...detail });
@@ -116,7 +116,7 @@ function specFailures(spec: Record<string, unknown>): RunFailure[] {
   return failures;
 }
 
-function suiteFailures(suites: unknown): RunFailure[] {
+function suiteFailures(suites: unknown, errorsFallback = true): RunFailure[] {
   const failures: RunFailure[] = [];
   function visit(values: unknown[]) {
     for (const value of values) {
@@ -125,7 +125,7 @@ function suiteFailures(suites: unknown): RunFailure[] {
       if (Array.isArray(suite.specs)) {
         for (const specValue of suite.specs) {
           const spec = asRecord(specValue);
-          if (spec) failures.push(...specFailures(spec));
+          if (spec) failures.push(...specFailures(spec, errorsFallback));
         }
       }
       if (Array.isArray(suite.suites)) visit(suite.suites);
@@ -215,7 +215,9 @@ export function normalizeRunResult(payload: unknown): RunResult {
   const value = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>;
   const status: RunResult['status'] = value.status === 'passed' || value.status === 'stopped' ? value.status : 'failed';
   const topLevelError = Array.isArray(value.errors) ? value.errors.map(asRecord).find(Boolean) : undefined;
-  const error = errorMessage(value.error) || errorMessage(topLevelError) || suiteError(value.suites);
+  const failures = status === 'failed' ? suiteFailures(value.suites) : undefined;
+  const stepFailure = status === 'failed' ? suiteFailures(value.suites, false)[0] : undefined;
+  const error = stepFailure?.message || errorMessage(value.error) || errorMessage(topLevelError) || suiteError(value.suites);
   const artifacts = Array.isArray(value.artifacts)
     ? value.artifacts.filter((item): item is RunArtifact => {
       if (!item || typeof item !== 'object') return false;
@@ -233,8 +235,9 @@ export function normalizeRunResult(payload: unknown): RunResult {
   const failed = reportTotal === undefined ? 0 : unexpected;
   const skipped = reportTotal === undefined ? 0 : skippedCount;
   const spec = firstSpec(value.suites);
-  const errorLocation = status === 'failed' ? location(topLevelError?.location) ?? suiteErrorLocation(value.suites) : undefined;
-  const failures = status === 'failed' ? suiteFailures(value.suites) : undefined;
+  const errorLocation = status === 'failed'
+    ? stepFailure ? stepFailure.location : location(topLevelError?.location) ?? suiteErrorLocation(value.suites)
+    : undefined;
   return {
     status,
     durationMs: typeof value.durationMs === 'number' && Number.isFinite(value.durationMs) ? value.durationMs : 0,

@@ -2,7 +2,7 @@
 
 ## Status
 
-Completed. Generated tests now expose meaningful user-action steps, and the Test Report selects the most specific failed Playwright step instead of only the enclosing test.
+Completed, including the scoped final-review follow-up. Generated tests expose meaningful user-action steps, and both the Test Report details and summary select the most specific failed Playwright step instead of only the enclosing test.
 
 ## Implementation
 
@@ -12,17 +12,19 @@ Completed. Generated tests now expose meaningful user-action steps, and the Test
 - Prefers a nested error cause over a generic wrapper message and inherits a valid wrapper location only when the inner cause has none.
 - Retains the existing test/spec/file/`Unknown step` fallback when no useful step title exists.
 - Falls back to existing `results[].errors` parsing when a result has no failed step details, avoiding duplicate wrapper failures.
-- Left stopped-run stripping, counts, logs, artifacts, summary error handling, and report rendering unchanged.
+- Uses the deepest usable step failure for top-level `RunResult.error` and `report.errorLocation`; `results[].errors` remains the summary fallback only when no usable step failure exists.
+- Left generated step titles, stopped-run stripping, counts, logs, artifacts, and report rendering unchanged.
 
 ## Tests
 
 - Added generator coverage confirming all supported generated statements are wrapped and representative action titles are meaningful.
 - Added a standard Playwright JSON `steps` fixture with nested parent/leaf errors and assertions for the exact leaf title, message, and location.
+- Added summary assertions proving `RunResult.error` and `report.errorLocation` match the leaf step rather than the generic `results[].errors` wrapper.
 - Strengthened nested error coverage so a specific inner reason wins over a non-empty generic wrapper.
 
 Verification:
 
-- `node --test tests/generator.test.mjs tests/runner.test.mjs`: 20 passed, 0 failed.
+- `node --test tests/runner.test.mjs`: 14 passed, 0 failed.
 - `npm test && npm run build`: 76 passed, 0 failed; TypeScript and Vite production build succeeded.
 - The first sandboxed full-suite run reached 75 passing tests but the recorder listener was denied on `127.0.0.1` with `EPERM`. The required rerun with local-listener permission passed completely.
 

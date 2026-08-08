@@ -103,6 +103,8 @@ test('uses the most specific failed Playwright step title, message, and location
     message: 'Timeout 5000ms exceeded while clicking Place order',
     location: { file: 'tests/checkout.spec.ts', line: 12, column: 7 }
   }]);
+  assert.equal(result.error, 'Timeout 5000ms exceeded while clicking Place order');
+  assert.deepEqual(result.report.errorLocation, { file: 'tests/checkout.spec.ts', line: 12, column: 7 });
 });
 
 test('normalizes nested failure messages and ignores malformed errors', () => {
