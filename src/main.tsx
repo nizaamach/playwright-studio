@@ -253,7 +253,8 @@ function App() {
     setRunMessage('');
     try {
       setRunStatus('running');
-      const result = await window.studio.runTest({ testId: selected.id, source: previewCode, projectPath: state?.projectPath, testDir: state?.project.testDir, baseURL: selectedEnvironment.baseURL || state?.project.baseURL, environment: selected.variables });
+      const runSource = selected.readOnly ? previewCode : generateCode(selected.name, removeRedundantNavigationSteps(selected.steps), selected.variables);
+      const result = await window.studio.runTest({ testId: selected.id, source: runSource, projectPath: state?.projectPath, testDir: state?.project.testDir, baseURL: selectedEnvironment.baseURL || state?.project.baseURL, environment: selected.variables });
       setRunResult(result);
       setRunStatus(result.status);
     } catch (error) {
