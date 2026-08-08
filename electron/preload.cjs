@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('studio', {
   runTest: (request) => ipcRenderer.invoke('run-test', request),
   stopTest: () => ipcRenderer.invoke('stop-test'),
   openArtifact: (artifactPath) => ipcRenderer.invoke('open-artifact', artifactPath),
+  openProjectFolder: (projectPath) => ipcRenderer.invoke('open-project-folder', projectPath),
   startRecorder: (url) => ipcRenderer.invoke('start-recorder', url),
   stopRecorder: () => ipcRenderer.invoke('stop-recorder'),
   countLocator: (locatorType, selector, role) => ipcRenderer.invoke('count-locator', locatorType, selector, role),

@@ -91,6 +91,17 @@ ipcMain.handle('open-artifact', async (_event, artifactPath) => {
   }
 });
 
+ipcMain.handle('open-project-folder', async (_event, projectPath) => {
+  if (typeof projectPath !== 'string' || !path.isAbsolute(projectPath)) return false;
+  try {
+    const stats = await fs.stat(projectPath);
+    if (!stats.isDirectory()) return false;
+    return (await shell.openPath(projectPath)) === '';
+  } catch {
+    return false;
+  }
+});
+
 ipcMain.handle('start-recorder', async (event, url) => {
   if (recorderSession) throw new Error('A recorder session is already active.');
   try {

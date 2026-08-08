@@ -40,6 +40,7 @@ declare global {
       runTest(request: RunRequest): Promise<RunResult>;
       stopTest(): Promise<{ ok: boolean }>;
       openArtifact(path: string): Promise<boolean>;
+      openProjectFolder(path: string): Promise<boolean>;
       startRecorder(url: string): Promise<{ ok: boolean }>;
       stopRecorder(): Promise<{ ok: boolean }>;
       countLocator(locatorType: LocatorType, selector: string, role?: string): Promise<LocatorDiagnostic>;
