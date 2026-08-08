@@ -76,12 +76,16 @@ const stepTitle = (step: Step, testName: string) => {
 
 export function generateCode(name: string, steps: Step[], variables?: VariableMap) {
   const variableMap = variables && Object.keys(variables).length ? variables : undefined;
-  const lines = steps.map((step) => {
+  const lines = steps.map((step, index) => {
     const target = locator(step);
+    const previous = steps[index - 1];
+    const openTarget = step.type === 'click' && step.locatorType === 'role' && step.role === 'option' && previous?.type === 'fill'
+      ? locator(previous)
+      : undefined;
     const statement = (() => {
       switch (step.type) {
       case 'navigate': return `await page.goto(${valueExpression(step.url, variableMap)});`;
-      case 'click': return `await ${target}.click();`;
+      case 'click': return `${openTarget ? `await ${openTarget}.click();\n    ` : ''}await ${target}.click();`;
       case 'hover': return `await ${target}.hover();`;
       case 'focus': return `await ${target}.focus();`;
       case 'clear': return `await ${target}.clear();`;
