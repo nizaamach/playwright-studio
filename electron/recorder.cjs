@@ -60,7 +60,7 @@ const captureScript = `(() => {
     return { locatorType: 'xpath', selector: '/' + path.join('/') };
   };
   let inputTimer;
-  const target = (event) => event.target && event.target.closest && event.target.closest('input,textarea,select,button,a,[role]');
+  const target = (event) => event.target && event.target.closest && event.target.closest('input,textarea,select,button,a,[role],[id]');
   document.addEventListener('click', (event) => { const node = target(event); if (node) emit({ type: 'click', ...locator(node) }); }, true);
   document.addEventListener('input', (event) => { const node = target(event); if (!node || node.type === 'checkbox' || node.type === 'radio') return; clearTimeout(inputTimer); inputTimer = setTimeout(() => emit({ type: 'fill', ...locator(node), value: node.value || '' }), 250); }, true);
   document.addEventListener('change', (event) => { const node = target(event); if (!node) return; if (node.tagName.toLowerCase() === 'select') emit({ type: 'select', ...locator(node), value: node.value }); else if (node.type === 'checkbox' || node.type === 'radio') emit({ type: 'check', ...locator(node), options: node.checked ? 'check' : 'uncheck' }); }, true);

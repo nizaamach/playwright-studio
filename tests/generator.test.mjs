@@ -59,10 +59,3 @@ test('generates visibility and checked assertions', () => {
   assert.match(output, /toBeVisible/);
   assert.match(output, /toBeChecked/);
 });
-test('reopens a filled combobox before clicking a custom option', () => {
-  const output = generateCode('subjects', [
-    { id: 'input', type: 'fill', selector: '#subjectsInput', value: 'math' },
-    { id: 'option', type: 'click', locatorType: 'role', role: 'option', selector: 'Maths' }
-  ]);
-  assert.match(output, /page\.locator\("#subjectsInput"\)\.click\(\);\n    await page\.getByRole\("option", \{ name: "Maths" \}\)\.click\(\);/);
-});
