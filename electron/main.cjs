@@ -6,6 +6,7 @@ const { deleteStudioTest, discoverTests, renameStudioTest } = require('./project
 const { runGeneratedTest, stopRunningTest } = require('./runner.cjs');
 
 const studioDir = '.playwright-studio';
+const defaultProjectPath = path.resolve(process.cwd(), 'browser-local');
 let recorderSession = null;
 
 function createWindow() {
@@ -23,8 +24,17 @@ function createWindow() {
 async function writeJson(file, value) { await fs.mkdir(path.dirname(file), { recursive: true }); await fs.writeFile(file, JSON.stringify(value, null, 2) + '\n'); }
 
 ipcMain.handle('select-project', async () => {
-  const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+  const result = await dialog.showOpenDialog({ defaultPath: defaultProjectPath, properties: ['openDirectory'] });
   return result.canceled ? null : result.filePaths[0];
+});
+
+ipcMain.handle('open-default-project', async () => {
+  try {
+    const stats = await fs.stat(defaultProjectPath);
+    return stats.isDirectory() ? defaultProjectPath : null;
+  } catch {
+    return null;
+  }
 });
 
 ipcMain.handle('create-project', async (_event, name, location) => {

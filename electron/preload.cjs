@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('studio', {
   selectProject: () => ipcRenderer.invoke('select-project'),
+  openDefaultProject: () => ipcRenderer.invoke('open-default-project'),
   createProject: (name, location) => ipcRenderer.invoke('create-project', name, location),
   readProject: (projectPath) => ipcRenderer.invoke('read-project', projectPath),
   saveTest: (projectPath, test) => ipcRenderer.invoke('save-test', projectPath, test),

@@ -31,6 +31,7 @@ declare global {
   interface Window {
     studio?: {
       selectProject(): Promise<string | null>;
+      openDefaultProject(): Promise<string | null>;
       createProject(name: string, location: string): Promise<string>;
       readProject(path: string): Promise<ProjectState>;
       saveTest(path: string, test: TestCase): Promise<boolean>;

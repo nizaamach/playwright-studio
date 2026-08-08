@@ -173,7 +173,7 @@ function App() {
   };
 
   async function openProject() {
-    const path = await window.studio?.selectProject(); if (!path) return;
+    const path = await window.studio?.openDefaultProject(); if (!path) return;
     const loaded = await window.studio?.readProject(path); if (loaded) { setState(loaded); selectTest(loaded.tests.find((test) => !test.readOnly) || initialTest()); }
   }
   async function openRecentFile(file: RecentFile) {
