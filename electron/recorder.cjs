@@ -79,7 +79,14 @@ async function startRecorder(url, onEvent, onError) {
     page.on('framenavigated', (frame) => { if (frame === page.mainFrame() && !closing) onEvent({ id: randomUUID(), type: 'navigate', url: frame.url() }); });
     page.on('close', () => { if (!closing) onError('Recorder browser was closed before recording stopped.'); });
     context.on('close', () => { if (!closing) onError('Recorder session ended unexpectedly.'); });
-    await page.goto(url);
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    } catch (error) {
+      const timedOut = error && (error.name === 'TimeoutError' || /timeout/i.test(error.message || ''));
+      if (!timedOut) throw error;
+      // A slow page can still be interactive enough to record. Keep the
+      // session alive and let the user continue instead of failing startup.
+    }
     return { browser, context, page, close: async () => { closing = true; await browser.close(); } };
   } catch (error) {
     if (browser) await browser.close().catch(() => {});

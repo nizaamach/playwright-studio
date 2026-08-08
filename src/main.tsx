@@ -71,7 +71,7 @@ function App() {
     (stepGroupFilter === 'All' || getStepGroup(step) === stepGroupFilter) && matchesStepQuery(step, stepQuery)
   )), [selected.steps, stepGroupFilter, stepQuery]);
   const recordUrlError = validateRecordUrl(recordUrl);
-  const canRecord = Boolean(window.studio) && recorderState === 'idle' && !selected.readOnly && !recordUrlError;
+  const canRecord = Boolean(window.studio) && (recorderState === 'idle' || recorderState === 'error') && !selected.readOnly && !recordUrlError;
   const projectContextAvailable = Boolean(state?.project.baseURL || state?.project.projects?.length);
   const selectedEnvironment = defaultEnvironments.find((environment) => environment.name === environmentName) || defaultEnvironments[0];
   const visibleTests = state ? filterTests(state.tests, { query: testQuery }) : [];
@@ -270,7 +270,7 @@ function App() {
     if (!window.studio || recordUrlError) return;
     setRecordedSteps([]); setRecorderMessage(''); setRecorderState('recording');
     const result = await window.studio.startRecorder(recordUrl.trim());
-    if (!result.ok) { setRecorderState('error'); return; }
+    if (!result.ok) { setRecorderState('idle'); setRecorderMessage('Unable to start recorder. Check the URL and try again.'); return; }
     if (selected.name.trim().toLowerCase() === 'untitled test') update({ name: suggestTestName(recordUrl) });
   }
   async function stopRecording() {
