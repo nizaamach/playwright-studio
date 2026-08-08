@@ -35,3 +35,13 @@ test('removes consecutive duplicate navigations for the same URL', () => {
   ];
   assert.deepEqual(removeRedundantNavigationSteps(steps).map((step) => step.url), ['https://example.com/', 'https://example.com/login']);
 });
+
+test('coalesces a fill repeated after a same-field key event', () => {
+  const steps = [
+    { id: '1', type: 'fill', locatorType: 'label', selector: 'Email', value: 'demo@demo.' },
+    { id: '2', type: 'press', locatorType: 'label', selector: 'Email', value: 'Tab' },
+    { id: '3', type: 'fill', locatorType: 'label', selector: 'Email', value: 'demo@demo.com' }
+  ];
+  const result = removeRedundantNavigationSteps(steps);
+  assert.deepEqual(result.map((step) => [step.type, step.value]), [['fill', 'demo@demo.com'], ['press', 'Tab']]);
+});
