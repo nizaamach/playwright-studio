@@ -99,7 +99,21 @@ button:active { transform: translateY(1px); }
 .browser-mode-message { color: var(--warning) !important; }
 .run-panel { display: grid; gap: 10px; margin: 0 0 20px; padding: 13px 14px; border: 1px solid var(--line); border-left: 2px solid var(--accent); background: #101719; }
 .run-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.run-actions { display: flex; align-items: center; gap: 9px; }
 .run-head small { display: block; margin-top: 6px; color: var(--muted); font-size: 11px; }
+.run-headed-toggle { position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 9px 4px 6px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--text); cursor: pointer; transition: border-color .16s ease, background .16s ease, opacity .16s ease; }
+.run-headed-toggle:hover { border-color: var(--accent); background: var(--surface-soft); }
+.run-headed-toggle.is-disabled { opacity: .46; cursor: not-allowed; }
+.run-headed-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.run-switch { display: grid; align-items: center; width: 30px; height: 18px; padding: 2px; border-radius: 999px; background: var(--line-strong); transition: background .16s ease; }
+.run-switch > span { width: 14px; height: 14px; border-radius: 50%; background: var(--text); transform: translateX(0); transition: transform .16s ease, background .16s ease; }
+.run-headed-toggle input:checked + .run-switch { background: var(--accent); }
+.run-headed-toggle input:checked + .run-switch > span { background: var(--accent-ink); transform: translateX(12px); }
+.run-headed-toggle input:focus-visible + .run-switch { outline: 2px solid var(--accent); outline-offset: 3px; }
+.run-headed-copy { display: grid; gap: 3px; min-width: 76px; line-height: 1; }
+.run-headed-copy strong { font-size: 10px; font-weight: 800; letter-spacing: -.01em; }
+.run-headed-copy small { margin: 0; color: var(--quiet); font: 800 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .13em; }
+.run-headed-toggle input:checked ~ .run-headed-copy small { color: var(--accent); }
 .run-status { display: flex; align-items: center; gap: 7px; color: var(--muted); font: 800 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; }
 .run-status span:last-child { margin-left: auto; color: var(--quiet); font-weight: 500; text-transform: none; }
 .run-status.passed { color: var(--accent); }
