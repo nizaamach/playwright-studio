@@ -26,7 +26,12 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 }
 
 function count(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0;
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+
+function total(...counts: number[]) {
+  const value = counts.reduce((sum, count) => sum + count, 0);
+  return Number.isSafeInteger(value) ? value : 0;
 }
 
 function location(value: unknown): RunReport['errorLocation'] {
@@ -113,7 +118,7 @@ export function normalizeRunResult(payload: unknown): RunResult {
     artifacts,
     report: {
       file: typeof spec?.file === 'string' ? spec.file : '',
-      total: passed + failed + skipped + flaky,
+      total: total(passed, failed, skipped, flaky),
       passed,
       failed,
       skipped,

@@ -35,6 +35,20 @@ test('normalizes missing and malformed report fields safely', () => {
   }).report, { file: '', total: 0, passed: 0, failed: 0, skipped: 0 });
 });
 
+test('normalizes fractional and overflowing report counts safely', () => {
+  assert.deepEqual(normalizeRunResult({
+    stats: { expected: 1.5, unexpected: 2, skipped: 0, flaky: 0 }
+  }).report, { file: '', total: 2, passed: 0, failed: 2, skipped: 0 });
+
+  assert.deepEqual(normalizeRunResult({
+    stats: { expected: Number.MAX_VALUE, unexpected: Number.MAX_VALUE, skipped: Number.MAX_VALUE, flaky: Number.MAX_VALUE }
+  }).report, { file: '', total: 0, passed: 0, failed: 0, skipped: 0 });
+
+  assert.equal(normalizeRunResult({
+    stats: { expected: Number.MAX_SAFE_INTEGER, unexpected: Number.MAX_SAFE_INTEGER, skipped: 0, flaky: 0 }
+  }).report.total, 0);
+});
+
 test('normalizes malformed failures safely', () => {
   const result = normalizeRunResult({ status: 'failed', error: { message: 'boom' } });
   assert.equal(result.status, 'failed');
