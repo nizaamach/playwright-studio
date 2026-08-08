@@ -8,6 +8,7 @@ import { History } from './history';
 import { getLocatorQuality } from './locator-quality';
 import { canRun, runLabel, type RunResult, type RunStatus } from './runner';
 import { importSpec } from './importer';
+import { removeRedundantNavigationSteps } from './recorder-utils';
 import { defaultEnvironments } from './environments';
 import { filterTests } from './test-organization';
 import { getStepGroup, matchesStepQuery, type StepGroup } from './step-organizer';
@@ -278,7 +279,7 @@ function App() {
     setRecorderState('stopping');
     const result = await window.studio.stopRecorder();
     if (!result.ok) { setRecorderMessage('Recorder session is no longer active.'); setRecorderState('error'); return; }
-    const captured = recordedSteps;
+    const captured = removeRedundantNavigationSteps(recordedSteps);
     commit({ ...historyRef.current.current, steps: [...historyRef.current.current.steps, ...captured] });
     const actionSummary = captured.map((step) => labels[step.type]).join(', ');
     setRecordedSteps([]); setRecorderMessage(captured.length ? `${captured.length} step${captured.length === 1 ? '' : 's'} captured: ${actionSummary}` : 'Recording stopped. No steps captured.'); setRecorderState('idle');
