@@ -1,10 +1,12 @@
 const { spawn } = require('node:child_process');
+const { existsSync } = require('node:fs');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
 let activeProcess = null;
 
-function buildRunCommand(cwd, specFile) {
+function buildRunCommand(cwd, specFile, playwrightBin) {
+  if (playwrightBin) return { command: playwrightBin, args: ['test', specFile, '--reporter=json'], cwd };
   return { command: process.platform === 'win32' ? 'npx.cmd' : 'npx', args: ['playwright', 'test', specFile, '--reporter=json'], cwd };
 }
 
@@ -45,9 +47,11 @@ async function runGeneratedTest(request) {
   const specFile = `${String(request.testId || 'test').replace(/[^a-z0-9-_]/gi, '-') || 'test'}.spec.ts`;
   const specPath = path.join(runRoot, specFile);
   await fs.writeFile(specPath, request.source, 'utf8');
-  const command = buildRunCommand(projectPath, path.relative(projectPath, specPath));
+  const localBin = path.resolve(__dirname, '..', 'node_modules', '.bin', process.platform === 'win32' ? 'playwright.cmd' : 'playwright');
+  const command = buildRunCommand(projectPath, path.relative(projectPath, specPath), existsSync(localBin) ? localBin : undefined);
   const startedAt = Date.now();
-  const env = { ...process.env, ...(request.environment || {}) };
+  const studioNodeModules = path.resolve(__dirname, '..', 'node_modules');
+  const env = { ...process.env, NODE_PATH: [studioNodeModules, process.env.NODE_PATH].filter(Boolean).join(path.delimiter), ...(request.environment || {}) };
   if (request.baseURL) env.PLAYWRIGHT_STUDIO_BASE_URL = request.baseURL;
   const child = spawn(command.command, command.args, { cwd: command.cwd, env, windowsHide: true });
   activeProcess = child;

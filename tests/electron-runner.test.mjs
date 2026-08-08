@@ -21,3 +21,9 @@ test('keeps the generated spec path relative to the project root', () => {
   assert.equal(result.cwd, '/project');
   assert.equal(result.args[2], 'tests/playwright-studio-runs/run-1/test.spec.ts');
 });
+
+test('can use the Studio Playwright binary without npx', () => {
+  const result = buildRunCommand('/project', 'tests/run/test.spec.ts', '/studio/node_modules/.bin/playwright');
+  assert.equal(result.command, '/studio/node_modules/.bin/playwright');
+  assert.deepEqual(result.args, ['test', 'tests/run/test.spec.ts', '--reporter=json']);
+});
