@@ -291,7 +291,7 @@ function App() {
       const result = normalizeRunResult(await window.studio.runTest({ testId: selected.id, source: runSource, projectPath: state?.projectPath, testDir: state?.project.testDir, baseURL: selectedEnvironment.baseURL || state?.project.baseURL, environment: selected.variables, headed: runHeaded }));
       if (runId !== runIdRef.current) return;
       if (stoppedRunIdRef.current === runId) {
-        const { errorLocation, ...report } = result.report;
+        const { errorLocation, failures, ...report } = result.report;
         setRunResult({ ...result, status: 'stopped', report });
         return;
       }
