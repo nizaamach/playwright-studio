@@ -2,6 +2,10 @@ import type { Step } from './types';
 import type { VariableMap } from './variables';
 
 const quote = (value = '') => JSON.stringify(value);
+const screenshotPath = (value: string | undefined, fallback: string) => {
+  const path = value?.trim() || fallback;
+  return /\.(png|jpe?g)$/i.test(path) ? path : `${path}.png`;
+};
 const locator = (step: Step) => {
   const value = quote(step.selector || '');
   switch (step.locatorType) {
@@ -65,7 +69,7 @@ export function generateCode(name: string, steps: Step[], variables?: VariableMa
       case 'check': return `  await ${target}.${step.options === 'uncheck' ? 'uncheck' : 'check'}();`;
       case 'upload': return `  await ${target}.setInputFiles(${valueExpression(step.value, variableMap)});`;
       case 'wait': return `  await page.waitForTimeout(${Math.max(0, Number(step.timeout || step.value || 500))});`;
-      case 'screenshot': return `  await page.screenshot({ path: ${quote(step.value || `${name}.png`)}, fullPage: true });`;
+      case 'screenshot': return `  await page.screenshot({ path: ${quote(screenshotPath(step.value, `${name}.png`))}, fullPage: true });`;
       case 'assert':
         if (step.assertion === 'text') return `  await expect(${target}).toContainText(${valueExpression(step.value, variableMap)});`;
         if (step.assertion === 'value') return `  await expect(${target}).toHaveValue(${valueExpression(step.value, variableMap)});`;

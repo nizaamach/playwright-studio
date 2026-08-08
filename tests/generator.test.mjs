@@ -29,6 +29,9 @@ test('generator produces valid Playwright statements for all MVP action types', 
   for (const expected of ['page.goto', '.click()', '.getByTestId("submit").click()', "page.locator('xpath=' +", '//button[@type=', '.hover()', '.focus()', '.clear()', '.press("Enter")', '.fill(', '.selectOption(', '.check()', '.setInputFiles(', 'toContainText(', '.toBeEnabled()', '.toHaveCount(3)', '.toHaveAttribute("aria-label", "Email")', 'getByLabel("Email", { exact: true })', 'waitForTimeout(250)', 'page.screenshot']) assert.match(output, new RegExp(expected.replace(/[()[\].]/g, '\\$&')));
 });
 test('generated output imports Playwright test and expect', () => { assert.match(generateCode('test', []), /import \{ test, expect \} from '@playwright\/test'/); });
+test('adds a supported extension to screenshot paths', () => {
+  assert.match(generateCode('screenshots', [{ id: 'shot', type: 'screenshot', value: '/tmp/Screenshot' }]), /path: "\/tmp\/Screenshot\.png"/);
+});
 test('generates visibility and checked assertions', () => {
   const output = generateCode('assertions', [
     { id: 'a', type: 'assert', selector: '[data-ready]', locatorType: 'css', assertion: 'visible' },
