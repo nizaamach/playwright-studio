@@ -75,7 +75,12 @@ async function runGeneratedTest(request) {
     ...(request.environment || {})
   }, runOptions);
   if (request.baseURL) env.PLAYWRIGHT_STUDIO_BASE_URL = request.baseURL;
-  const child = spawn(command.command, command.args, { cwd: command.cwd, env, windowsHide: true });
+  const child = spawn(command.command, command.args, {
+    cwd: command.cwd,
+    env,
+    windowsHide: true,
+    shell: process.platform === 'win32'
+  });
   activeProcess = child;
   let stdout = '';
   let stderr = '';
