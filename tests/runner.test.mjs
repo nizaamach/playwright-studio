@@ -4,8 +4,35 @@ import { canRun, normalizeRunResult, runLabel } from '../src/runner.ts';
 
 test('normalizes a passing run with artifacts', () => {
   assert.deepEqual(normalizeRunResult({ status: 'passed', durationMs: 42, stdout: 'ok', artifacts: [{ kind: 'trace', path: '/tmp/a.zip' }] }), {
-    status: 'passed', durationMs: 42, stdout: 'ok', stderr: '', error: '', artifacts: [{ kind: 'trace', path: '/tmp/a.zip' }]
+    status: 'passed', durationMs: 42, stdout: 'ok', stderr: '', error: '', artifacts: [{ kind: 'trace', path: '/tmp/a.zip' }],
+    report: { file: '', total: 0, passed: 0, failed: 0, skipped: 0 }
   });
+});
+
+test('normalizes a Playwright JSON report summary', () => {
+  const result = normalizeRunResult({
+    status: 'failed',
+    stats: { expected: 2, unexpected: 1, skipped: 1, flaky: 0 },
+    suites: [{
+      specs: [{
+        file: 'tests/checkout.spec.ts',
+        tests: [{ results: [{ errors: [{ location: { file: 'tests/checkout.spec.ts', line: 24, column: 9 } }] }] }]
+      }]
+    }]
+  });
+
+  assert.deepEqual(result.report, {
+    file: 'tests/checkout.spec.ts', total: 4, passed: 2, failed: 1, skipped: 1,
+    errorLocation: { file: 'tests/checkout.spec.ts', line: 24, column: 9 }
+  });
+});
+
+test('normalizes missing and malformed report fields safely', () => {
+  assert.deepEqual(normalizeRunResult({
+    stats: { expected: '2', unexpected: Infinity, skipped: null, flaky: -1 },
+    suites: [{}],
+    errors: [{ location: { file: 42, line: '3', column: NaN } }]
+  }).report, { file: '', total: 0, passed: 0, failed: 0, skipped: 0 });
 });
 
 test('normalizes malformed failures safely', () => {
