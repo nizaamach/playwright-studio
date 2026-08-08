@@ -41,7 +41,7 @@ const captureScript = `(() => {
     if (label) return { locatorType: 'label', selector: label };
     const role = node.getAttribute('role') || ({ button: 'button', a: 'link', textarea: 'textbox', select: 'combobox' }[tag]);
     const name = text(node);
-    if (role && name && ['button', 'link', 'checkbox', 'radio', 'combobox'].includes(role)) return { locatorType: 'role', role, selector: name };
+    if (role && name && ['button', 'link', 'checkbox', 'radio', 'combobox', 'option'].includes(role)) return { locatorType: 'role', role, selector: name };
     const testId = node.getAttribute('data-testid');
     if (testId) return { locatorType: 'testId', selector: testId };
     if (node.id) return { locatorType: 'css', selector: '#' + cssEscape(node.id) };
