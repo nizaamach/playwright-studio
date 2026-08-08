@@ -31,15 +31,20 @@ function count(value: unknown) {
 
 function total(...counts: number[]) {
   const value = counts.reduce((sum, count) => sum + count, 0);
-  return Number.isSafeInteger(value) ? value : 0;
+  return Number.isSafeInteger(value) ? value : undefined;
 }
 
 function location(value: unknown): RunReport['errorLocation'] {
   const candidate = asRecord(value);
-  if (!candidate || typeof candidate.file !== 'string') return undefined;
-  const line = typeof candidate.line === 'number' && Number.isFinite(candidate.line) ? candidate.line : undefined;
-  const column = typeof candidate.column === 'number' && Number.isFinite(candidate.column) ? candidate.column : undefined;
+  if (!candidate || typeof candidate.file !== 'string' || !candidate.file) return undefined;
+  const line = typeof candidate.line === 'number' && Number.isSafeInteger(candidate.line) && candidate.line > 0 ? candidate.line : undefined;
+  const column = typeof candidate.column === 'number' && Number.isSafeInteger(candidate.column) && candidate.column > 0 ? candidate.column : undefined;
   return { file: candidate.file, ...(line === undefined ? {} : { line }), ...(column === undefined ? {} : { column }) };
+}
+
+function errorMessage(value: unknown): string {
+  const candidate = asRecord(value);
+  return typeof value === 'string' ? value : typeof candidate?.message === 'string' ? candidate.message : '';
 }
 
 function firstSpec(suites: unknown): Record<string, unknown> | undefined {
@@ -70,6 +75,23 @@ function resultErrorLocation(spec: Record<string, unknown> | undefined) {
   }
 }
 
+function resultError(spec: Record<string, unknown> | undefined) {
+  if (!spec || !Array.isArray(spec.tests)) return '';
+  for (const test of spec.tests) {
+    const testRecord = asRecord(test);
+    if (!testRecord || !Array.isArray(testRecord.results)) continue;
+    for (const result of testRecord.results) {
+      const errors = asRecord(result)?.errors;
+      if (!Array.isArray(errors)) continue;
+      for (const error of errors) {
+        const message = errorMessage(error);
+        if (message) return message;
+      }
+    }
+  }
+  return '';
+}
+
 function suiteErrorLocation(suites: unknown) {
   const pending = Array.isArray(suites) ? [...suites] : [];
   while (pending.length) {
@@ -85,15 +107,27 @@ function suiteErrorLocation(suites: unknown) {
   }
 }
 
+function suiteError(suites: unknown) {
+  const pending = Array.isArray(suites) ? [...suites] : [];
+  while (pending.length) {
+    const suite = asRecord(pending.shift());
+    if (!suite) continue;
+    if (Array.isArray(suite.specs)) {
+      for (const spec of suite.specs) {
+        const message = resultError(asRecord(spec));
+        if (message) return message;
+      }
+    }
+    if (Array.isArray(suite.suites)) pending.push(...suite.suites);
+  }
+  return '';
+}
+
 export function normalizeRunResult(payload: unknown): RunResult {
   const value = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>;
   const status: RunResult['status'] = value.status === 'passed' || value.status === 'stopped' ? value.status : 'failed';
-  const rawError = value.error;
-  const error = typeof rawError === 'string'
-    ? rawError
-    : rawError && typeof rawError === 'object' && 'message' in rawError
-      ? String(rawError.message)
-      : '';
+  const topLevelError = Array.isArray(value.errors) ? value.errors.map(asRecord).find(Boolean) : undefined;
+  const error = errorMessage(value.error) || errorMessage(topLevelError) || suiteError(value.suites);
   const artifacts = Array.isArray(value.artifacts)
     ? value.artifacts.filter((item): item is RunArtifact => {
       if (!item || typeof item !== 'object') return false;
@@ -102,13 +136,16 @@ export function normalizeRunResult(payload: unknown): RunResult {
     })
     : [];
   const stats = asRecord(value.stats) ?? {};
-  const passed = count(stats.expected);
-  const failed = count(stats.unexpected);
-  const skipped = count(stats.skipped);
+  const expected = count(stats.expected);
+  const unexpected = count(stats.unexpected);
+  const skippedCount = count(stats.skipped);
   const flaky = count(stats.flaky);
+  const reportTotal = total(expected, unexpected, skippedCount, flaky);
+  const passed = reportTotal === undefined ? 0 : expected + flaky;
+  const failed = reportTotal === undefined ? 0 : unexpected;
+  const skipped = reportTotal === undefined ? 0 : skippedCount;
   const spec = firstSpec(value.suites);
-  const topLevelError = Array.isArray(value.errors) ? value.errors.map(asRecord).find(Boolean) : undefined;
-  const errorLocation = location(topLevelError?.location) ?? suiteErrorLocation(value.suites);
+  const errorLocation = status === 'failed' ? location(topLevelError?.location) ?? suiteErrorLocation(value.suites) : undefined;
   return {
     status,
     durationMs: typeof value.durationMs === 'number' && Number.isFinite(value.durationMs) ? value.durationMs : 0,
@@ -118,7 +155,7 @@ export function normalizeRunResult(payload: unknown): RunResult {
     artifacts,
     report: {
       file: typeof spec?.file === 'string' ? spec.file : '',
-      total: total(passed, failed, skipped, flaky),
+      total: reportTotal ?? 0,
       passed,
       failed,
       skipped,

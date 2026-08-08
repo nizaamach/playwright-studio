@@ -6,7 +6,7 @@ import { isEditableTarget, suggestTestName, validateRecordUrl } from './fast-sta
 import { generateCode } from './generator';
 import { History } from './history';
 import { getLocatorQuality } from './locator-quality';
-import { canRun, runLabel, type RunResult, type RunStatus } from './runner';
+import { canRun, normalizeRunResult, runLabel, type RunResult, type RunStatus } from './runner';
 import { importSpec } from './importer';
 import { removeRedundantNavigationSteps } from './recorder-utils';
 import { getRecentTests } from './recent-tests';
@@ -55,6 +55,8 @@ function App() {
   const [runResult, setRunResult] = useState<RunResult | null>(null);
   const [runMessage, setRunMessage] = useState('');
   const [runHeaded, setRunHeaded] = useState(true);
+  const runIdRef = useRef(0);
+  const stoppedRunIdRef = useRef<number | null>(null);
   const [copyMessage, setCopyMessage] = useState('');
   const [importMessage, setImportMessage] = useState('');
   const [testQuery, setTestQuery] = useState('');
@@ -277,25 +279,35 @@ function App() {
   }
   async function runTest() {
     if (!window.studio || !canRun({ readOnly: Boolean(selected.readOnly), hasErrors: !canSave, hasStudio: true, status: runStatus })) return;
+    const runId = ++runIdRef.current;
+    stoppedRunIdRef.current = null;
     setRunStatus('queued');
     setRunResult(null);
     setRunMessage('');
     try {
       setRunStatus('running');
       const runSource = selected.readOnly ? previewCode : generateCode(selected.name, removeRedundantNavigationSteps(selected.steps), selected.variables);
-      const result = await window.studio.runTest({ testId: selected.id, source: runSource, projectPath: state?.projectPath, testDir: state?.project.testDir, baseURL: selectedEnvironment.baseURL || state?.project.baseURL, environment: selected.variables, headed: runHeaded });
+      const result = normalizeRunResult(await window.studio.runTest({ testId: selected.id, source: runSource, projectPath: state?.projectPath, testDir: state?.project.testDir, baseURL: selectedEnvironment.baseURL || state?.project.baseURL, environment: selected.variables, headed: runHeaded }));
+      if (runId !== runIdRef.current) return;
+      if (stoppedRunIdRef.current === runId) {
+        const { errorLocation, ...report } = result.report;
+        setRunResult({ ...result, status: 'stopped', report });
+        return;
+      }
       setRunResult(result);
       setRunStatus(result.status);
     } catch (error) {
+      if (runId !== runIdRef.current || stoppedRunIdRef.current === runId) return;
       setRunStatus('failed');
       setRunMessage(error instanceof Error ? error.message : 'Unable to run test.');
     }
   }
   async function stopTest() {
-    if (!window.studio || runStatus !== 'running') return;
-    await window.studio.stopTest();
+    if (!window.studio || (runStatus !== 'queued' && runStatus !== 'running')) return;
+    stoppedRunIdRef.current = runIdRef.current;
     setRunStatus('stopped');
     setRunMessage('Run stopped.');
+    await window.studio.stopTest();
   }
   async function startRecording() {
     if (!window.studio || recordUrlError) return;
