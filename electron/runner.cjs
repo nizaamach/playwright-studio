@@ -6,9 +6,10 @@ const path = require('node:path');
 let activeProcess = null;
 
 function buildRunCommand(cwd, specFile, playwrightBin, options = {}) {
+  const normalizedSpecFile = String(specFile).replaceAll('\\', '/');
   const args = playwrightBin
-    ? ['test', specFile, '--reporter=json']
-    : ['playwright', 'test', specFile, '--reporter=json'];
+    ? ['test', normalizedSpecFile, '--reporter=json']
+    : ['playwright', 'test', normalizedSpecFile, '--reporter=json'];
   if (options && options.headed === true) args.push('--headed');
   return { command: playwrightBin || (process.platform === 'win32' ? 'npx.cmd' : 'npx'), args, cwd };
 }

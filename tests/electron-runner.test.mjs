@@ -22,6 +22,11 @@ test('keeps the generated spec path relative to the project root', () => {
   assert.equal(result.args[2], 'tests/playwright-studio-runs/run-1/test.spec.ts');
 });
 
+test('normalizes Windows spec paths for Playwright regex matching', () => {
+  const result = buildRunCommand('D:/project', 'tests\\playwright-studio-runs\\run-1\\test.spec.ts');
+  assert.equal(result.args[2], 'tests/playwright-studio-runs/run-1/test.spec.ts');
+});
+
 test('can use the Studio Playwright binary without npx', () => {
   const result = buildRunCommand('/project', 'tests/run/test.spec.ts', '/studio/node_modules/.bin/playwright');
   assert.equal(result.command, '/studio/node_modules/.bin/playwright');
