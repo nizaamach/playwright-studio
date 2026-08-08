@@ -1,0 +1,14 @@
+{
+  "id": "test-1786115461367",
+  "name": "Test Form",
+  "steps": [
+    {
+      "id": "abc7d3c4-040c-424a-8e26-25ae769cbd3e",
+      "type": "navigate",
+      "locatorType": "css",
+      "url": "https://example.com",
+      "value": ""
+    }
+  ],
+  "generatedCode": "import { test, expect } from '@playwright/test';\n\ntest(\"Test Form\", async ({ page }) => {\n  await page.goto(\"https://example.com\");\n});\n"
+}

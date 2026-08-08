@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.playwright-studio/runs/
+.DS_Store
+.git-playwright/
