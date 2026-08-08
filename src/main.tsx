@@ -10,6 +10,7 @@ import { canRun, runLabel, type RunResult, type RunStatus } from './runner';
 import { importSpec } from './importer';
 import { removeRedundantNavigationSteps } from './recorder-utils';
 import { getRecentTests } from './recent-tests';
+import { readRecentFiles, touchRecentFile, type RecentFile } from './recent-files';
 import { defaultEnvironments } from './environments';
 import { filterTests } from './test-organization';
 import { getStepGroup, matchesStepQuery, type StepGroup } from './step-organizer';
@@ -57,6 +58,7 @@ function App() {
   const [importMessage, setImportMessage] = useState('');
   const [testQuery, setTestQuery] = useState('');
   const [environmentName, setEnvironmentName] = useState('Project');
+  const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
   const [saveMessage, setSaveMessage] = useState('');
   const [draftNotice, setDraftNotice] = useState<DraftEnvelope | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -78,11 +80,17 @@ function App() {
   const selectedEnvironment = defaultEnvironments.find((environment) => environment.name === environmentName) || defaultEnvironments[0];
   const visibleTests = state ? filterTests(state.tests, { query: testQuery }) : [];
   const recentTests = getRecentTests(visibleTests);
+
+  const rememberRecentFile = (test: ManagedTest, projectPath: string | undefined) => {
+    if (!projectPath || test.readOnly) return;
+    setRecentFiles(touchRecentFile(window.localStorage, { projectPath, testId: test.id, name: test.name, updatedAt: new Date().toISOString() }));
+  };
   const selectedTemplate = templateDefinitions.find((template) => template.id === templateId);
   const missingTemplateVariables = selectedTemplate?.requiredVariables.filter((name) => !templateVariables[name]?.trim()) || [];
   const canApplyTemplate = Boolean(selectedTemplate && missingTemplateVariables.length === 0);
 
   useEffect(() => {
+    setRecentFiles(readRecentFiles(window.localStorage));
     document.documentElement.dataset.theme = theme;
     try { localStorage.setItem(themeKey, theme); } catch { /* Theme preference is best effort. */ }
   }, [theme]);
@@ -137,6 +145,7 @@ function App() {
     setSelected(test);
     setTemplateId(null);
     setHistoryVersion((current) => current + 1);
+    if (state?.tests.some((item) => item.id === test.id)) rememberRecentFile(test, state.projectPath);
   };
   const undo = () => {
     const previous = historyRef.current.undo();
@@ -167,6 +176,17 @@ function App() {
     const path = await window.studio?.selectProject(); if (!path) return;
     const loaded = await window.studio?.readProject(path); if (loaded) { setState(loaded); selectTest(loaded.tests.find((test) => !test.readOnly) || initialTest()); }
   }
+  async function openRecentFile(file: RecentFile) {
+    if (window.studio) {
+      const loaded = await window.studio.readProject(file.projectPath);
+      if (!loaded) return;
+      setState(loaded);
+      selectTest(loaded.tests.find((test) => test.id === file.testId) || loaded.tests.find((test) => !test.readOnly) || initialTest());
+      return;
+    }
+    const matching = state?.tests.find((test) => test.id === file.testId);
+    if (matching) selectTest(matching);
+  }
   async function openFolder() {
     if (!state?.projectPath || !window.studio) return;
     const opened = await window.studio.openProjectFolder(state.projectPath);
@@ -190,6 +210,7 @@ function App() {
     }
     historyRef.current.reset(saved);
     setSelected(saved);
+    rememberRecentFile(saved, state?.projectPath || 'browser-local');
     setHistoryVersion((current) => current + 1);
     try { clearDraft(window.localStorage); } catch { /* Ignore unavailable storage. */ }
     setSaveMessage('Test saved successfully.');
@@ -352,7 +373,7 @@ function App() {
   return <div className="app-shell">
     <header className="topbar"><div className="brand"><span className="brand-mark">PW</span><div><strong>Playwright Studio</strong><small>Visual test builder</small></div></div><div className="top-actions"><button onClick={createProject}>New project</button><button onClick={openProject}>Open project</button><button onClick={openFolder} disabled={!state || !window.studio}>Open folder</button>{state && <><span className="project-pill">{state.project.name}</span><span className={`context-pill ${projectContextAvailable ? '' : 'unavailable'}`}>{state.project.baseURL || 'context unavailable'}</span></>}<button className="theme-toggle" onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>{theme === 'dark' ? '☼ Light' : '◐ Dark'}</button></div></header>
     <main className="workspace">
-      <aside className="sidebar"><div className="eyebrow">PROJECT EXPLORER</div>{state ? <><div className="tree-root">▾ {state.project.name}</div><div className="project-context"><div className="eyebrow">PROJECT CONTEXT</div><div className="context-row"><span>testDir</span><code>{state.project.testDir}</code></div>{state.project.baseURL && <div className="context-row"><span>baseURL</span><code title={state.project.baseURL}>{state.project.baseURL}</code></div>}{state.project.projects?.length ? <div className="context-row context-projects"><span>projects</span><div>{state.project.projects.map((project) => <code className="context-project" key={project}>{project}</code>)}</div></div> : null}{!projectContextAvailable && <small className="context-unavailable">Static project context unavailable.</small>}</div><label className="project-search"><span>Search tests</span><input value={testQuery} onChange={(event) => setTestQuery(event.target.value)} placeholder="Name, tag, folder" /></label>{recentTests.length > 0 && <><div className="tree-section recent-section">▾ recent tests</div>{recentTests.map((test) => <button className={`tree-test recent-test ${selected.id === test.id ? 'active' : ''}`} key={`recent-${test.id}`} onClick={() => selectTest(test)}>◷ {test.name}</button>)}</>}<div className="tree-section">▾ tests</div>{visibleTests.map((test) => <button className={`tree-test ${selected.id === test.id ? 'active' : ''}`} key={test.id} onClick={() => selectTest(test)}>◫ {test.name}{test.readOnly && <small className="readonly-tag">read-only</small>}</button>)}<button className="new-test" onClick={() => selectTest(initialTest())}>＋ New test</button></> : <div className="empty-side">Create or open a project to begin.</div>}</aside>
+      <aside className="sidebar"><div className="eyebrow">PROJECT EXPLORER</div>{recentFiles.length > 0 && <><div className="tree-section global-recent-section">▾ recent files</div>{recentFiles.map((file) => <button className={`tree-test recent-test ${state?.projectPath === file.projectPath && selected.id === file.testId ? 'active' : ''}`} key={`${file.projectPath}:${file.testId}`} onClick={() => void openRecentFile(file)}>◷ {file.name}<small className="recent-file-project">{file.projectPath}</small></button>)}</>}{state ? <><div className="tree-root">▾ {state.project.name}</div><div className="project-context"><div className="eyebrow">PROJECT CONTEXT</div><div className="context-row"><span>testDir</span><code>{state.project.testDir}</code></div>{state.project.baseURL && <div className="context-row"><span>baseURL</span><code title={state.project.baseURL}>{state.project.baseURL}</code></div>}{state.project.projects?.length ? <div className="context-row context-projects"><span>projects</span><div>{state.project.projects.map((project) => <code className="context-project" key={project}>{project}</code>)}</div></div> : null}{!projectContextAvailable && <small className="context-unavailable">Static project context unavailable.</small>}</div><label className="project-search"><span>Search tests</span><input value={testQuery} onChange={(event) => setTestQuery(event.target.value)} placeholder="Name, tag, folder" /></label>{recentTests.length > 0 && <><div className="tree-section recent-section">▾ recent tests</div>{recentTests.map((test) => <button className={`tree-test recent-test ${selected.id === test.id ? 'active' : ''}`} key={`recent-${test.id}`} onClick={() => selectTest(test)}>◷ {test.name}</button>)}</>}<div className="tree-section">▾ tests</div>{visibleTests.map((test) => <button className={`tree-test ${selected.id === test.id ? 'active' : ''}`} key={test.id} onClick={() => selectTest(test)}>◫ {test.name}{test.readOnly && <small className="readonly-tag">read-only</small>}</button>)}<button className="new-test" onClick={() => selectTest(initialTest())}>＋ New test</button></> : <div className="empty-side">Create or open a project to begin.</div>}</aside>
       <section className="builder"><div className="section-head"><div><div className="eyebrow">TEST BUILDER</div><input className="test-title" value={selected.name} readOnly={selected.readOnly} onChange={(event) => update({ name: event.target.value })} /></div><div className="builder-actions">{!selected.readOnly && <><button className="ghost" onClick={undo} disabled={!historyRef.current.canUndo}>Undo</button><button className="ghost" onClick={redo} disabled={!historyRef.current.canRedo}>Redo</button><button className="ghost" onClick={renameSelected} disabled={!state || !window.studio}>Rename</button><button className="ghost danger-action" onClick={deleteSelected} disabled={!state || !window.studio}>Delete</button><button className="ghost" onClick={() => update({ steps: [] })}>Clear</button><button className="primary" onClick={save} disabled={!canSave}>Save test</button></>}</div></div>
         {!selected.readOnly && <div className="recorder-bar"><div><div className="eyebrow">BROWSER RECORDER</div><small className={!window.studio ? 'browser-mode-message' : undefined}>{!window.studio ? 'Recorder requires Playwright Studio Desktop.' : recorderState === 'recording' ? `${recordedSteps.length} steps captured` : recorderState === 'stopping' ? 'Finishing recording…' : 'Record actions from a controlled Chromium window'}</small></div>{recorderState === 'recording' || recorderState === 'stopping' ? <button className="stop-record" onClick={stopRecording} disabled={recorderState === 'stopping'}>■ Stop recording</button> : <div className="record-start"><div><input value={recordUrl} onChange={(event) => setRecordUrl(event.target.value)} placeholder="https://example.com" aria-invalid={Boolean(recordUrl && recordUrlError)} aria-describedby="record-url-help" /><small id="record-url-help">{recordUrlError || 'Enter the starting URL for Chromium.'}</small></div><button className="record" onClick={startRecording} disabled={!canRecord}>● Record</button></div>}</div>}
         {recorderMessage && <div className={`recorder-message ${recorderState === 'error' ? 'error' : ''}`}>{recorderMessage}</div>}

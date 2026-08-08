@@ -67,6 +67,7 @@ button:active { transform: translateY(1px); }
 .tree-test { display: block; width: 100%; padding: 9px 10px; border: 0; background: transparent; color: var(--muted); text-align: left; }
 .tree-test:hover { background: var(--surface-soft); }
 .tree-test.active { color: var(--accent); background: #18231d; }
+.recent-file-project { display: block; margin: 4px 0 0 19px; overflow: hidden; color: var(--quiet); font: 9px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; text-overflow: ellipsis; white-space: nowrap; }
 .readonly-tag { display: block; margin: 4px 0 0 19px; color: var(--quiet); font: 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; letter-spacing: .08em; }
 .new-test { width: 100%; margin: 18px 0; border-style: dashed; background: transparent; }
 .empty-side { margin: 24px 8px; color: var(--quiet); font-size: 12px; line-height: 1.6; }
