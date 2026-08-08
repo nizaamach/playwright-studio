@@ -6,6 +6,7 @@ import { isEditableTarget, suggestTestName, validateRecordUrl } from './fast-sta
 import { generateCode } from './generator';
 import { History } from './history';
 import { getLocatorQuality } from './locator-quality';
+import { canRun, runLabel, type RunResult, type RunStatus } from './runner';
 import { getStepGroup, matchesStepQuery, type StepGroup } from './step-organizer';
 import { createTemplateSteps, templateDefinitions, type TemplateId, type TemplateVariable } from './templates';
 import type { VariableMap } from './variables';
@@ -42,6 +43,9 @@ function App() {
   const [recordUrl, setRecordUrl] = useState('');
   const [recordedSteps, setRecordedSteps] = useState<Step[]>([]);
   const [recorderMessage, setRecorderMessage] = useState('');
+  const [runStatus, setRunStatus] = useState<RunStatus>('idle');
+  const [runResult, setRunResult] = useState<RunResult | null>(null);
+  const [runMessage, setRunMessage] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
   const [draftNotice, setDraftNotice] = useState<DraftEnvelope | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -210,6 +214,27 @@ function App() {
     setSaveMessage('TypeScript file downloaded.');
     window.setTimeout(() => setSaveMessage(''), 2500);
   }
+  async function runTest() {
+    if (!window.studio || !canRun({ readOnly: Boolean(selected.readOnly), hasErrors: !canSave, hasStudio: true, status: runStatus })) return;
+    setRunStatus('queued');
+    setRunResult(null);
+    setRunMessage('');
+    try {
+      setRunStatus('running');
+      const result = await window.studio.runTest({ testId: selected.id, source: previewCode, projectPath: state?.projectPath, baseURL: state?.project.baseURL, environment: selected.variables });
+      setRunResult(result);
+      setRunStatus(result.status);
+    } catch (error) {
+      setRunStatus('failed');
+      setRunMessage(error instanceof Error ? error.message : 'Unable to run test.');
+    }
+  }
+  async function stopTest() {
+    if (!window.studio || runStatus !== 'running') return;
+    await window.studio.stopTest();
+    setRunStatus('stopped');
+    setRunMessage('Run stopped.');
+  }
   async function startRecording() {
     if (!window.studio || recordUrlError) return;
     setRecordedSteps([]); setRecorderMessage(''); setRecorderState('recording');
@@ -292,6 +317,7 @@ function App() {
         {!selected.readOnly && <div className="recorder-bar"><div><div className="eyebrow">BROWSER RECORDER</div><small className={!window.studio ? 'browser-mode-message' : undefined}>{!window.studio ? 'Recorder requires Playwright Studio Desktop.' : recorderState === 'recording' ? `${recordedSteps.length} steps captured` : recorderState === 'stopping' ? 'Finishing recording…' : 'Record actions from a controlled Chromium window'}</small></div>{recorderState === 'recording' || recorderState === 'stopping' ? <button className="stop-record" onClick={stopRecording} disabled={recorderState === 'stopping'}>■ Stop recording</button> : <div className="record-start"><div><input value={recordUrl} onChange={(event) => setRecordUrl(event.target.value)} placeholder="https://example.com" aria-invalid={Boolean(recordUrl && recordUrlError)} aria-describedby="record-url-help" /><small id="record-url-help">{recordUrlError || 'Enter the starting URL for Chromium.'}</small></div><button className="record" onClick={startRecording} disabled={!canRecord}>● Record</button></div>}</div>}
         {recorderMessage && <div className={`recorder-message ${recorderState === 'error' ? 'error' : ''}`}>{recorderMessage}</div>}
         {saveMessage && <div className="recorder-message">{saveMessage}</div>}
+        <RunPanel status={runStatus} result={runResult} message={runMessage} available={Boolean(window.studio)} onRun={() => void runTest()} onStop={() => void stopTest()} />
         {draftNotice && <div className="recorder-message"><span>Unsaved draft from {new Date(draftNotice.savedAt).toLocaleString()}.</span><button onClick={restoreDraft}>Restore draft</button><button onClick={discardDraft}>Discard</button></div>}
         {selected.readOnly ? <div className="readonly-preview">Open the source file in VS Code to edit this test.</div> : <><div className="step-filters"><label className="filter-search"><span>Search steps</span><input value={stepQuery} onChange={(event) => setStepQuery(event.target.value)} placeholder="Type, locator, value…" /></label><label className="filter-group"><span>Group</span><select value={stepGroupFilter} onChange={(event) => setStepGroupFilter(event.target.value as 'All' | StepGroup)}>{stepGroups.map((group) => <option key={group} value={group}>{group === 'All' ? 'All groups' : group}</option>)}</select></label></div><div className="steps-list">{selected.steps.length ? (visibleSteps.length ? visibleSteps.map(({ step, index }) => <StepCard key={step.id} index={index} step={step} error={errors[index]} onChange={(patch) => setStep(step.id, patch)} onDelete={() => update({ steps: historyRef.current.current.steps.filter((item) => item.id !== step.id) })} onMove={moveStep} onDuplicate={duplicateStep} onApplyRecommendation={(patch) => setStep(step.id, patch)} />) : <div className="empty-steps filtered-empty">No steps match this search or group.</div>) : <div className="empty-steps">Add an action from the toolbar below or start with a template.</div>}</div><div className="action-toolbar"><span className="toolbar-label">ADD ACTION</span>{(Object.keys(labels) as StepType[]).map((type) => <button key={type} onClick={() => addStep(type)}>＋ {labels[type]}</button>)}<button onClick={() => { setShowTemplates((current) => !current); setTemplateId(null); }}>＋ Use template</button></div>{showTemplates && <div className="template-picker"><div className="eyebrow">STARTER TEMPLATES</div>{templateDefinitions.map((template) => <button className={templateId === template.id ? 'selected' : ''} key={template.id} onClick={() => chooseTemplate(template.id)}><strong>{template.name}</strong><small>{template.description}</small></button>)}{selectedTemplate && <div className="template-config"><div><div className="eyebrow">CONFIGURE {selectedTemplate.name.toUpperCase()}</div><small>Required values become local test variables in the generated TypeScript.</small></div>{selectedTemplate.requiredVariables.map((name) => <label className="field" key={name}><span>{templateVariableLabels[name]}</span><input type={name === 'password' ? 'password' : 'text'} value={templateVariables[name] || ''} placeholder={name === 'baseUrl' ? 'https://app.example.com' : name === 'email' ? 'qa@example.com' : '••••••••'} aria-invalid={missingTemplateVariables.includes(name)} onChange={(event) => setTemplateVariables((current) => ({ ...current, [name]: event.target.value }))} /></label>)}{missingTemplateVariables.length > 0 && <div className="validation-note">{missingTemplateVariables.map((name) => templateVariableLabels[name]).join(', ')} {missingTemplateVariables.length === 1 ? 'is' : 'are'} required.</div>}<div className="template-config-actions"><button className="ghost" onClick={() => setTemplateId(null)}>Cancel</button><button className="primary" onClick={applyTemplate} disabled={!canApplyTemplate}>Apply template</button></div></div>}</div>}</>}
         {isDirty && <div className="dirty-note">● Unsaved changes</div>}
@@ -299,6 +325,11 @@ function App() {
       <aside className="code-panel"><div className="code-head"><div><div className="eyebrow">{selected.readOnly ? 'EXISTING SOURCE' : 'GENERATED CODE'}</div><span>Playwright TypeScript</span></div><div className="code-actions"><button className="icon-button" onClick={() => navigator.clipboard.writeText(previewCode)}>Copy</button><button className="icon-button export-button" onClick={exportCode}>Export .ts</button></div></div><pre><code>{previewCode}</code></pre></aside>
     </main>
   </div>;
+}
+
+function RunPanel({ status, result, message, available, onRun, onStop }: { status: RunStatus; result: RunResult | null; message: string; available: boolean; onRun: () => void; onStop: () => void }) {
+  const running = status === 'queued' || status === 'running';
+  return <section className="run-panel" aria-label="Test runner"><div className="run-head"><div><div className="eyebrow">LOCAL TEST RUNNER</div><small>{available ? 'Execute the generated test without changing your saved steps.' : 'Desktop runner unavailable in browser mode.'}</small></div>{running ? <button className="stop-record" onClick={onStop}>■ Stop</button> : <button className="primary" onClick={onRun} disabled={!available}>{runLabel(status)}</button>}</div>{status !== 'idle' && <div className={`run-status ${status}`}><span className="run-dot" />{status === 'queued' ? 'Queued' : status === 'running' ? 'Running…' : status === 'passed' ? 'Passed' : status === 'failed' ? 'Failed' : 'Stopped'}{result && <span>{result.durationMs} ms</span>}</div>}{message && <div className="run-error">{message}</div>}{result && <div className="run-details">{result.error && <div className="run-error">{result.error}</div>}{(result.stdout || result.stderr) && <details><summary>Show runner logs</summary><pre>{[result.stdout, result.stderr].filter(Boolean).join('\n')}</pre></details>}{result.artifacts.length > 0 && <div className="run-artifacts">{result.artifacts.map((artifact) => <button key={artifact.path} onClick={() => window.studio?.openArtifact(artifact.path)}>{artifact.kind}</button>)}</div>}</div>}</section>;
 }
 
 function LocatorDiagnosticPanel({ step }: { step: Step }) {

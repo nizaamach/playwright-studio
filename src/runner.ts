@@ -1,6 +1,6 @@
 export type RunStatus = 'idle' | 'queued' | 'running' | 'passed' | 'failed' | 'stopped';
 export type RunArtifact = { kind: 'screenshot' | 'trace' | 'video'; path: string };
-export type RunRequest = { testId: string; source: string; baseURL?: string; environment?: Record<string, string> };
+export type RunRequest = { testId: string; source: string; projectPath?: string; baseURL?: string; environment?: Record<string, string> };
 export type RunResult = {
   status: Exclude<RunStatus, 'idle' | 'queued' | 'running'>;
   durationMs: number;

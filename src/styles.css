@@ -94,6 +94,23 @@ button:active { transform: translateY(1px); }
 .recording-summary, .summary-feedback { padding: 8px 10px; border: 1px solid #3b5630; border-radius: var(--radius); background: #111d15; }
 .recorder-message.error { color: var(--danger); }
 .browser-mode-message { color: var(--warning) !important; }
+.run-panel { display: grid; gap: 10px; margin: 0 0 20px; padding: 13px 14px; border: 1px solid var(--line); border-left: 2px solid var(--accent); background: #101719; }
+.run-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.run-head small { display: block; margin-top: 6px; color: var(--muted); font-size: 11px; }
+.run-status { display: flex; align-items: center; gap: 7px; color: var(--muted); font: 800 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; }
+.run-status span:last-child { margin-left: auto; color: var(--quiet); font-weight: 500; text-transform: none; }
+.run-status.passed { color: var(--accent); }
+.run-status.failed { color: var(--danger); }
+.run-status.stopped { color: var(--warning); }
+.run-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.run-status.running .run-dot, .run-status.queued .run-dot { animation: pulse 1s infinite ease-in-out; }
+.run-error { color: var(--danger); font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+.run-details details { color: var(--muted); font-size: 10px; }
+.run-details summary { cursor: pointer; }
+.run-details pre { min-height: 0; max-height: 160px; margin-top: 8px; padding: 8px; overflow: auto; border: 1px solid var(--line); border-left: 0; background: #0a1012; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.run-artifacts { display: flex; gap: 6px; }
+.run-artifacts button { padding: 5px 8px; color: var(--accent); font-size: 10px; text-transform: capitalize; }
+@keyframes pulse { 50% { opacity: .35; } }
 .readonly-banner, .readonly-preview { border: 1px solid var(--line); background: #101719; color: var(--muted); font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .readonly-banner { margin-bottom: 20px; padding: 13px 14px; border-left: 2px solid var(--quiet); }
 .readonly-preview { padding: 28px 16px; color: var(--quiet); }
@@ -218,6 +235,7 @@ pre { min-height: 240px; margin: 0; padding-left: 14px; border-left: 1px solid v
 [data-theme="light"] .step-filters { background: var(--surface); }
 [data-theme="light"] .project-context,
 [data-theme="light"] .recorder-bar,
+[data-theme="light"] .run-panel,
 [data-theme="light"] .readonly-banner,
 [data-theme="light"] .readonly-preview,
 [data-theme="light"] .template-config { background: #f7faf7; }
