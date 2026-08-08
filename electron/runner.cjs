@@ -37,6 +37,7 @@ async function listArtifacts(directory) {
 async function runGeneratedTest(request) {
   if (!request || typeof request.source !== 'string' || !request.source.trim()) throw new Error('Test source is required.');
   const projectPath = path.resolve(String(request.projectPath || process.cwd()));
+  await fs.mkdir(path.join(projectPath, '.playwright-studio', 'runs'), { recursive: true });
   const runRoot = await fs.mkdtemp(path.join(projectPath, '.playwright-studio', 'runs', 'run-'));
   const specFile = `${String(request.testId || 'test').replace(/[^a-z0-9-_]/gi, '-') || 'test'}.spec.ts`;
   const specPath = path.join(runRoot, specFile);
