@@ -1,8 +1,9 @@
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { countLocator, startRecorder } = require('./recorder.cjs');
 const { deleteStudioTest, discoverTests, renameStudioTest } = require('./project.cjs');
+const { runGeneratedTest, stopRunningTest } = require('./runner.cjs');
 
 const studioDir = '.playwright-studio';
 let recorderSession = null;
@@ -75,6 +76,19 @@ ipcMain.handle('export-code', async (_event, fileName, code) => {
   if (result.canceled || !result.filePath) return false;
   await fs.writeFile(result.filePath.endsWith('.ts') ? result.filePath : `${result.filePath}.ts`, code);
   return true;
+});
+
+ipcMain.handle('run-test', async (_event, request) => runGeneratedTest(request));
+ipcMain.handle('stop-test', async () => ({ ok: stopRunningTest() }));
+ipcMain.handle('open-artifact', async (_event, artifactPath) => {
+  if (typeof artifactPath !== 'string' || !path.isAbsolute(artifactPath)) return false;
+  try {
+    const stats = await fs.stat(artifactPath);
+    if (!stats.isFile()) return false;
+    return (await shell.openPath(artifactPath)) === '';
+  } catch {
+    return false;
+  }
 });
 
 ipcMain.handle('start-recorder', async (event, url) => {

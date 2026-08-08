@@ -1,0 +1,79 @@
+const { spawn } = require('node:child_process');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
+
+let activeProcess = null;
+
+function buildRunCommand(cwd, specFile) {
+  return { command: process.platform === 'win32' ? 'npx.cmd' : 'npx', args: ['playwright', 'test', specFile, '--reporter=json'], cwd };
+}
+
+function parseRunnerOutput(stdout, exitCode = 0) {
+  try {
+    const parsed = JSON.parse(stdout);
+    return { ...parsed, status: parsed.status === 'passed' && exitCode === 0 ? 'passed' : 'failed' };
+  } catch {
+    return { status: exitCode === 0 ? 'passed' : 'failed', stdout };
+  }
+}
+
+async function listArtifacts(directory) {
+  const artifacts = [];
+  async function visit(current) {
+    let entries;
+    try { entries = await fs.readdir(current, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const file = path.join(current, entry.name);
+      if (entry.isDirectory()) await visit(file);
+      else if (entry.name.endsWith('.zip')) artifacts.push({ kind: 'trace', path: file });
+      else if (/\.(png|jpg|jpeg)$/i.test(entry.name)) artifacts.push({ kind: 'screenshot', path: file });
+      else if (/\.webm$/i.test(entry.name)) artifacts.push({ kind: 'video', path: file });
+    }
+  }
+  await visit(directory);
+  return artifacts;
+}
+
+async function runGeneratedTest(request) {
+  if (!request || typeof request.source !== 'string' || !request.source.trim()) throw new Error('Test source is required.');
+  const projectPath = path.resolve(String(request.projectPath || process.cwd()));
+  const runRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-studio-run-'));
+  const specFile = `${String(request.testId || 'test').replace(/[^a-z0-9-_]/gi, '-') || 'test'}.spec.ts`;
+  const specPath = path.join(runRoot, specFile);
+  await fs.writeFile(specPath, request.source, 'utf8');
+  const command = buildRunCommand(projectPath, specPath);
+  const startedAt = Date.now();
+  const env = { ...process.env, ...(request.environment || {}) };
+  if (request.baseURL) env.PLAYWRIGHT_STUDIO_BASE_URL = request.baseURL;
+  const child = spawn(command.command, command.args, { cwd: command.cwd, env, windowsHide: true });
+  activeProcess = child;
+  let stdout = '';
+  let stderr = '';
+  child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
+  child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+  const exitCode = await new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', resolve);
+  });
+  activeProcess = null;
+  const parsed = parseRunnerOutput(stdout, exitCode);
+  return {
+    ...parsed,
+    status: exitCode === 0 ? 'passed' : 'failed',
+    durationMs: Date.now() - startedAt,
+    stdout,
+    stderr,
+    error: exitCode === 0 ? '' : (stderr.trim() || parsed.error || 'Playwright test failed.'),
+    artifacts: await listArtifacts(runRoot)
+  };
+}
+
+function stopRunningTest() {
+  if (!activeProcess) return false;
+  activeProcess.kill('SIGTERM');
+  activeProcess = null;
+  return true;
+}
+
+module.exports = { buildRunCommand, parseRunnerOutput, runGeneratedTest, stopRunningTest };
