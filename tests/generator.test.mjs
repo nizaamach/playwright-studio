@@ -34,9 +34,11 @@ test('adds a supported extension to screenshot paths', () => {
 });
 test('uses CSS locators for structural html and body targets', () => {
   const output = generateCode('structure', [
-    { id: 'body', type: 'assert', locatorType: 'text', selector: 'body', assertion: 'text', value: 'Invalid email or password!' }
+    { id: 'body', type: 'assert', locatorType: 'text', selector: 'body', assertion: 'text', value: 'Invalid email or password!' },
+    { id: 'role-body', type: 'assert', locatorType: 'role', role: 'button', selector: 'body', assertion: 'visible' }
   ]);
   assert.match(output, /expect\(page\.locator\("body"\)\)\.toContainText/);
+  assert.match(output, /expect\(page\.locator\("body"\)\)\.toBeVisible/);
 });
 test('generates visibility and checked assertions', () => {
   const output = generateCode('assertions', [
