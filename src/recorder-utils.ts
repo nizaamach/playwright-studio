@@ -2,10 +2,24 @@ import type { Step, StepType } from './types';
 
 const navigationActions = new Set<StepType>(['click', 'press', 'check', 'select']);
 
-/** Removes navigation events that are already caused by the immediately preceding action. */
+const sameLocator = (left: Step, right: Step) => (
+  left.locatorType === right.locatorType
+  && left.selector === right.selector
+  && left.role === right.role
+);
+
+/** Removes recorder noise while preserving the user's meaningful actions. */
 export function removeRedundantNavigationSteps(steps: Step[]) {
-  return steps.filter((step, index) => {
-    const previous = steps[index - 1];
-    return !(step.type === 'navigate' && previous && navigationActions.has(previous.type));
-  });
+  const normalized: Step[] = [];
+  for (const step of steps) {
+    const previous = normalized[normalized.length - 1];
+    if (step.type === 'fill' && previous?.type === 'fill' && sameLocator(previous, step)) {
+      normalized[normalized.length - 1] = step;
+      continue;
+    }
+    if (step.type === 'navigate' && previous?.type === 'navigate' && step.url === previous.url) continue;
+    if (step.type === 'navigate' && previous && navigationActions.has(previous.type)) continue;
+    normalized.push(step);
+  }
+  return normalized;
 }
