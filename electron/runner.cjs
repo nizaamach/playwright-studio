@@ -13,6 +13,15 @@ function buildRunCommand(cwd, specFile, playwrightBin, options = {}) {
   return { command: playwrightBin || (process.platform === 'win32' ? 'npx.cmd' : 'npx'), args, cwd };
 }
 
+function prepareRunSource(source, options = {}) {
+  if (options && options.headed === true) return source;
+  return `import { test as __playwrightStudioTest } from '@playwright/test';\n__playwrightStudioTest.use({ headless: true });\n${source}`;
+}
+
+function buildRunEnvironment(baseEnvironment, options = {}) {
+  return { ...baseEnvironment, PWDEBUG: '0' };
+}
+
 function parseRunnerOutput(stdout, exitCode = 0) {
   try {
     const parsed = JSON.parse(stdout);
@@ -49,17 +58,22 @@ async function runGeneratedTest(request) {
   const runRoot = await fs.mkdtemp(path.join(runBase, 'run-'));
   const specFile = `${String(request.testId || 'test').replace(/[^a-z0-9-_]/gi, '-') || 'test'}.spec.ts`;
   const specPath = path.join(runRoot, specFile);
-  await fs.writeFile(specPath, request.source, 'utf8');
+  const runOptions = { headed: request.headed === true };
+  await fs.writeFile(specPath, prepareRunSource(request.source, runOptions), 'utf8');
   const localBin = path.resolve(__dirname, '..', 'node_modules', '.bin', process.platform === 'win32' ? 'playwright.cmd' : 'playwright');
   const command = buildRunCommand(
     projectPath,
     path.relative(projectPath, specPath),
     existsSync(localBin) ? localBin : undefined,
-    { headed: request.headed === true }
+    runOptions
   );
   const startedAt = Date.now();
   const studioNodeModules = path.resolve(__dirname, '..', 'node_modules');
-  const env = { ...process.env, NODE_PATH: [studioNodeModules, process.env.NODE_PATH].filter(Boolean).join(path.delimiter), ...(request.environment || {}) };
+  const env = buildRunEnvironment({
+    ...process.env,
+    NODE_PATH: [studioNodeModules, process.env.NODE_PATH].filter(Boolean).join(path.delimiter),
+    ...(request.environment || {})
+  }, runOptions);
   if (request.baseURL) env.PLAYWRIGHT_STUDIO_BASE_URL = request.baseURL;
   const child = spawn(command.command, command.args, { cwd: command.cwd, env, windowsHide: true });
   activeProcess = child;
@@ -91,4 +105,4 @@ function stopRunningTest() {
   return true;
 }
 
-module.exports = { buildRunCommand, parseRunnerOutput, runGeneratedTest, stopRunningTest };
+module.exports = { buildRunCommand, buildRunEnvironment, parseRunnerOutput, prepareRunSource, runGeneratedTest, stopRunningTest };

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRunCommand, parseRunnerOutput } from '../electron/runner.cjs';
+import { buildRunCommand, buildRunEnvironment, parseRunnerOutput, prepareRunSource } from '../electron/runner.cjs';
 
 test('builds an isolated Playwright command', () => {
   const result = buildRunCommand('/tmp/run', 'test.spec.ts');
@@ -36,4 +36,20 @@ test('adds headed mode when requested', () => {
 test('keeps runs headless when headed is not enabled', () => {
   const result = buildRunCommand('/project', 'tests/run/test.spec.ts', '/studio/playwright', { headed: false });
   assert.deepEqual(result.args, ['test', 'tests/run/test.spec.ts', '--reporter=json']);
+});
+
+test('forces the headless fixture for omitted and invalid headed values', () => {
+  for (const headed of [undefined, false, 'true', 1, null]) {
+    assert.match(prepareRunSource('test("example", async () => {});', { headed }), /use\(\{ headless: true \}\)/);
+  }
+});
+
+test('leaves headed source unchanged when explicitly requested', () => {
+  const source = 'test("example", async () => {});';
+  assert.equal(prepareRunSource(source, { headed: true }), source);
+});
+
+test('overrides inherited and requested PWDEBUG for deterministic runs', () => {
+  assert.equal(buildRunEnvironment({ PWDEBUG: '1', OTHER: 'value' }, { headed: false }).PWDEBUG, '0');
+  assert.equal(buildRunEnvironment({ PWDEBUG: '1' }, { headed: true }).PWDEBUG, '0');
 });
