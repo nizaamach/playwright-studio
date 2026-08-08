@@ -23,7 +23,7 @@ export type Step = {
 };
 
 export type TestCase = { id: string; name: string; steps: Step[]; generatedCode: string; variables?: VariableMap };
-export type ManagedTest = TestCase & { source?: 'studio' | 'existing'; readOnly?: boolean; relativePath?: string };
+export type ManagedTest = TestCase & { source?: 'studio' | 'existing'; readOnly?: boolean; relativePath?: string; tags?: string[]; folder?: string };
 export type Project = { name: string; testDir: string; baseURL?: string; projects?: string[]; createdAt?: string };
 export type ProjectState = { project: Project; tests: ManagedTest[]; projectPath: string };
 
