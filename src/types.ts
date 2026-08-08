@@ -33,6 +33,7 @@ declare global {
       selectProject(): Promise<string | null>;
       openDefaultProject(): Promise<string | null>;
       createProject(name: string, location: string): Promise<string>;
+      createProjectDialog(): Promise<string | null>;
       readProject(path: string): Promise<ProjectState>;
       saveTest(path: string, test: TestCase): Promise<boolean>;
       renameTest(path: string, testId: string, name: string): Promise<ManagedTest>;

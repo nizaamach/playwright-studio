@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Playwright Studio — V2 editor mockup</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-2: #1c2128;
+      --surface-3: #21262d;
+      --line: #30363d;
+      --line-soft: #21262d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --quiet: #6e7681;
+      --accent: #c9ff68;
+      --accent-ink: #18210d;
+      --keyword: #ff7b72;
+      --string: #a5d6ff;
+      --function: #d2a8ff;
+      --number: #79c0ff;
+      --comment: #8b949e;
+      --success: #3fb950;
+      --warning: #d29922;
+      --danger: #f85149;
+      --mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      --sans: "Geist", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 1120px;
+      background: var(--bg);
+      color: var(--text);
+      font: 13px/1.45 var(--sans);
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+
+    .app { min-height: 100dvh; display: grid; grid-template-rows: 58px 1fr 30px; }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px; border-bottom: 1px solid var(--line);
+      background: #11161c;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; letter-spacing: -.02em; }
+    .brand-mark { width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid var(--accent); color: var(--accent); font: 700 13px var(--mono); }
+    .brand strong { font-size: 14px; }
+    .crumb { color: var(--muted); font: 11px var(--mono); margin-left: 24px; }
+    .top-actions { display: flex; gap: 8px; align-items: center; }
+    .icon-btn, .ghost-btn, .primary-btn {
+      border: 1px solid var(--line); border-radius: 5px; color: var(--text); background: var(--surface-2);
+      min-height: 32px; padding: 0 11px;
+    }
+    .icon-btn { width: 32px; padding: 0; color: var(--muted); }
+    .ghost-btn:hover, .icon-btn:hover { border-color: #58636e; background: var(--surface-3); }
+    .primary-btn { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+
+    .workspace { display: grid; grid-template-columns: 230px minmax(500px, 1fr) 405px; min-height: 0; }
+    .sidebar, .code-panel { background: var(--surface); }
+    .sidebar { border-right: 1px solid var(--line); padding: 18px 12px; }
+    .sidebar-head, .panel-head { display: flex; align-items: center; justify-content: space-between; }
+    .eyebrow { color: var(--quiet); font: 700 10px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+    .project-name { margin: 7px 0 18px; font-weight: 650; }
+    .tree { display: grid; gap: 3px; }
+    .tree-item { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 9px; border-radius: 4px; color: var(--muted); }
+    .tree-item.folder { color: var(--text); font: 12px var(--mono); }
+    .tree-item.active { background: #222b20; color: var(--accent); border-left: 2px solid var(--accent); padding-left: 7px; }
+    .tree-item .file { color: var(--quiet); font-size: 11px; }
+    .tree-item.active .file { color: #a9c687; }
+    .tree-indent { padding-left: 22px; }
+    .sidebar-footer { margin-top: 26px; padding: 12px 9px; border-top: 1px solid var(--line); color: var(--quiet); font: 10px/1.7 var(--mono); }
+
+    .builder { min-width: 0; overflow: auto; background: var(--bg); }
+    .builder-inner { max-width: 850px; margin: 0 auto; padding: 24px 28px 34px; }
+    .builder-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+    .title-input { width: 100%; max-width: 430px; border: 0; outline: 0; padding: 0; background: transparent; color: var(--text); font-size: 21px; font-weight: 700; letter-spacing: -.035em; }
+    .subline { display: flex; gap: 10px; align-items: center; margin-top: 7px; color: var(--muted); font: 11px var(--mono); }
+    .dirty { color: var(--warning); }
+    .header-actions { display: flex; gap: 6px; }
+    .toolbar { display: flex; gap: 8px; margin: 24px 0 18px; padding: 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+    .toolbar input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 4px; background: #0a0f14; color: var(--text); padding: 0 10px; outline: 0; }
+    .toolbar input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px #c9ff6826; }
+    .toolbar .record { display: flex; align-items: center; gap: 7px; padding: 0 14px; background: #261e1d; color: #ffb8b0; border-color: #733b36; }
+    .record-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); }
+    .section-label { display: flex; justify-content: space-between; align-items: center; margin: 22px 0 9px; }
+    .section-label small { color: var(--quiet); font: 10px var(--mono); }
+    .steps { display: grid; gap: 9px; }
+    .step { display: grid; grid-template-columns: 44px 1fr; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); overflow: hidden; }
+    .step-index { padding-top: 15px; text-align: center; color: var(--quiet); font: 11px var(--mono); border-right: 1px solid var(--line-soft); }
+    .step-body { padding: 12px 14px 14px; }
+    .step-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .step-name { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+    .step-type { color: var(--accent); font: 10px var(--mono); text-transform: uppercase; letter-spacing: .09em; }
+    .step-tools { display: flex; gap: 5px; }
+    .step-tools button { width: 26px; height: 26px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--quiet); }
+    .step-tools button:hover { border-color: var(--line); color: var(--text); background: var(--surface-3); }
+    .step-tools .delete:hover { color: var(--danger); }
+    .field-row { display: grid; grid-template-columns: 108px 1fr; gap: 12px; align-items: center; }
+    .field-row + .field-row { margin-top: 8px; }
+    .field-label { color: var(--muted); font: 10px var(--mono); text-transform: uppercase; letter-spacing: .1em; }
+    .field-value { min-height: 31px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 4px; background: #0a0f14; color: var(--string); font: 11px var(--mono); }
+    .locator-quality { display: flex; align-items: center; gap: 7px; margin-top: 9px; color: #8fcf9b; font: 10px var(--mono); }
+    .quality-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+    .add-step { width: 100%; min-height: 38px; border: 1px dashed #47515a; border-radius: 5px; color: var(--muted); background: transparent; font: 11px var(--mono); }
+    .add-step:hover { border-color: var(--accent); color: var(--accent); }
+
+    .code-panel { display: flex; min-width: 0; flex-direction: column; border-left: 1px solid var(--line); }
+    .code-head { min-height: 66px; padding: 16px 16px 12px; border-bottom: 1px solid var(--line); }
+    .code-title { margin-top: 7px; display: flex; gap: 8px; align-items: center; font: 12px var(--mono); }
+    .ts-badge { padding: 2px 5px; border: 1px solid #385a7a; border-radius: 3px; color: var(--number); font-size: 9px; }
+    .code-actions { display: flex; gap: 6px; }
+    .code-actions button { min-height: 26px; padding: 0 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-2); color: var(--muted); font: 10px var(--mono); }
+    pre { margin: 0; padding: 18px 16px 22px; overflow: auto; flex: 1; color: var(--text); font: 11px/1.82 var(--mono); tab-size: 2; }
+    .line { display: block; white-space: pre; }
+    .ln { display: inline-block; width: 27px; color: #484f58; user-select: none; }
+    .kw { color: var(--keyword); } .fn { color: var(--function); } .str { color: var(--string); } .num { color: var(--number); } .cm { color: var(--comment); }
+    .run-panel { margin: 0 16px 16px; padding: 13px; border: 1px solid var(--line); border-radius: 6px; background: #11161c; }
+    .run-row { display: flex; align-items: center; justify-content: space-between; }
+    .run-status { display: flex; align-items: center; gap: 7px; font: 11px var(--mono); color: #a9d6b0; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px #3fb9501f; }
+    .run-meta { color: var(--quiet); font: 10px var(--mono); }
+    .run-message { margin-top: 9px; color: var(--muted); font-size: 11px; }
+    .statusbar { display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-top: 1px solid var(--line); background: #11161c; color: var(--quiet); font: 10px var(--mono); }
+    .statusbar span { margin-right: 16px; } .statusbar .ok { color: #8fcf9b; }
+
+    @media (max-width: 1180px) { .workspace { grid-template-columns: 210px minmax(500px, 1fr); } .code-panel { grid-column: 1 / -1; min-height: 430px; border-top: 1px solid var(--line); border-left: 0; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><div class="brand-mark">&gt;_</div><strong>Playwright Studio</strong><span class="crumb">/ qa-regression / checkout-flow</span></div>
+      <div class="top-actions"><button class="icon-btn" aria-label="Search">⌕</button><button class="ghost-btn">Open project</button><button class="primary-btn">Save test</button></div>
+    </header>
+
+    <main class="workspace">
+      <aside class="sidebar">
+        <div class="sidebar-head"><span class="eyebrow">Project tests</span><button class="icon-btn">+</button></div>
+        <div class="project-name">qa-regression</div>
+        <nav class="tree" aria-label="Test files">
+          <div class="tree-item folder">⌄ <span>checkout</span></div>
+          <div class="tree-item tree-indent active"><span class="file">TS</span> checkout-flow</div>
+          <div class="tree-item tree-indent"><span class="file">TS</span> guest-checkout</div>
+          <div class="tree-item tree-indent"><span class="file">TS</span> payment-retry</div>
+          <div class="tree-item folder">⌄ <span>authentication</span></div>
+          <div class="tree-item tree-indent"><span class="file">TS</span> login-form</div>
+          <div class="tree-item tree-indent"><span class="file">TS</span> session-timeout</div>
+          <div class="tree-item folder">› <span>archive</span></div>
+        </nav>
+        <div class="sidebar-footer">5 tests · 2 folders<br />Last saved 2 min ago<br /><span style="color:var(--accent)">●</span> Desktop bridge connected</div>
+      </aside>
+
+      <section class="builder">
+        <div class="builder-inner">
+          <div class="builder-header">
+            <div><input class="title-input" value="checkout-flow" aria-label="Test name" /><div class="subline"><span class="dirty">● Unsaved changes</span><span>·</span><span>checkout/checkout-flow.spec.ts</span></div></div>
+            <div class="header-actions"><button class="ghost-btn">Undo</button><button class="ghost-btn">Redo</button></div>
+          </div>
+          <div class="toolbar"><input value="https://shop.example.test/checkout" aria-label="Record URL" /><button class="ghost-btn record"><span class="record-dot"></span>Record</button><button class="primary-btn">Run test</button></div>
+
+          <div class="section-label"><span class="eyebrow">Test steps</span><small>4 steps · ordered execution</small></div>
+          <div class="steps">
+            <article class="step"><div class="step-index">01</div><div class="step-body"><div class="step-head"><div class="step-name"><span class="step-type">navigate</span> Open checkout</div><div class="step-tools"><button>↑</button><button>↓</button><button>⧉</button><button class="delete">×</button></div></div><div class="field-row"><span class="field-label">URL</span><span class="field-value">https://shop.example.test/checkout</span></div></div></article>
+            <article class="step"><div class="step-index">02</div><div class="step-body"><div class="step-head"><div class="step-name"><span class="step-type">fill</span> Enter email</div><div class="step-tools"><button>↑</button><button>↓</button><button>⧉</button><button class="delete">×</button></div></div><div class="field-row"><span class="field-label">Locator</span><span class="field-value">[data-testid="email-input"]</span></div><div class="field-row"><span class="field-label">Value</span><span class="field-value">{{customerEmail}}</span></div><div class="locator-quality"><span class="quality-dot"></span> 1 match · stable test id locator</div></div></article>
+            <article class="step"><div class="step-index">03</div><div class="step-body"><div class="step-head"><div class="step-name"><span class="step-type">click</span> Submit order</div><div class="step-tools"><button>↑</button><button>↓</button><button>⧉</button><button class="delete">×</button></div></div><div class="field-row"><span class="field-label">Locator</span><span class="field-value">getByRole('button', { name: 'Place order' })</span></div><div class="locator-quality"><span class="quality-dot"></span> 1 match · accessible role locator</div></div></article>
+            <article class="step"><div class="step-index">04</div><div class="step-body"><div class="step-head"><div class="step-name"><span class="step-type">assert</span> Confirmation is visible</div><div class="step-tools"><button>↑</button><button>↓</button><button>⧉</button><button class="delete">×</button></div></div><div class="field-row"><span class="field-label">Assertion</span><span class="field-value">Element contains text</span></div><div class="field-row"><span class="field-label">Expected</span><span class="field-value">Order confirmed</span></div></div></article>
+          </div>
+          <div style="margin-top:12px"><button class="add-step">+ Add step</button></div>
+        </div>
+      </section>
+
+      <aside class="code-panel">
+        <div class="code-head"><div class="panel-head"><div><div class="eyebrow">Generated output</div><div class="code-title"><span class="ts-badge">TS</span> checkout-flow.spec.ts</div></div><div class="code-actions"><button>Copy</button><button>Export</button></div></div></div>
+        <pre aria-label="Generated TypeScript"><span class="line"><span class="ln">01</span><span class="kw">import</span> { test, expect } <span class="kw">from</span> <span class="str">'@playwright/test'</span>;</span>
+<span class="line"><span class="ln">02</span></span>
+<span class="line"><span class="ln">03</span><span class="fn">test</span>(<span class="str">'checkout-flow'</span>, <span class="kw">async</span> ({ page }) =&gt; {</span>
+<span class="line"><span class="ln">04</span>  <span class="kw">await</span> page.<span class="fn">goto</span>(<span class="str">'https://shop.example.test/checkout'</span>);</span>
+<span class="line"><span class="ln">05</span>  <span class="kw">await</span> page.<span class="fn">locator</span>(<span class="str">'[data-testid="email-input"]'</span>)</span>
+<span class="line"><span class="ln">06</span>    .<span class="fn">fill</span>(<span class="str">process.env.CUSTOMER_EMAIL</span>!);</span>
+<span class="line"><span class="ln">07</span>  <span class="kw">await</span> page.<span class="fn">getByRole</span>(<span class="str">'button'</span>, {</span>
+<span class="line"><span class="ln">08</span>    name: <span class="str">'Place order'</span></span>
+<span class="line"><span class="ln">09</span>  }).<span class="fn">click</span>();</span>
+<span class="line"><span class="ln">10</span>  <span class="kw">await</span> <span class="fn">expect</span>(page.<span class="fn">locator</span>(<span class="str">'[role="status"]'</span>))</span>
+<span class="line"><span class="ln">11</span>    .<span class="fn">toContainText</span>(<span class="str">'Order confirmed'</span>);</span>
+<span class="line"><span class="ln">12</span>});</span>
+<span class="line"><span class="ln">13</span></span>
+<span class="line"><span class="ln">14</span><span class="cm">// generated by Playwright Studio</span></span></pre>
+        <div class="run-panel"><div class="run-row"><div class="run-status"><span class="status-dot"></span> Passed</div><span class="run-meta">1.84s · 4 steps</span></div><div class="run-message">Latest run completed successfully. Trace and screenshot artifacts are available.</div></div>
+      </aside>
+    </main>
+    <footer class="statusbar"><div><span class="ok">● connected</span><span>Chromium</span><span>base: shop.example.test</span></div><div><span>UTF-8</span><span>TypeScript</span><span>V2</span></div></footer>
+  </div>
+</body>
+</html>

@@ -6,7 +6,7 @@ const { deleteStudioTest, discoverTests, renameStudioTest } = require('./project
 const { runGeneratedTest, stopRunningTest } = require('./runner.cjs');
 
 const studioDir = '.playwright-studio';
-const defaultProjectPath = path.resolve(process.cwd(), 'browser-local');
+const defaultProjectPath = path.resolve(process.cwd(), 'browser-local', 'playwright-studio-project');
 let recorderSession = null;
 
 function createWindow() {
@@ -23,8 +23,22 @@ function createWindow() {
 
 async function writeJson(file, value) { await fs.mkdir(path.dirname(file), { recursive: true }); await fs.writeFile(file, JSON.stringify(value, null, 2) + '\n'); }
 
+async function createProjectAt(projectPath, name) {
+  await fs.mkdir(path.join(projectPath, studioDir, 'tests'), { recursive: true });
+  await fs.mkdir(path.join(projectPath, 'tests'), { recursive: true });
+  await writeJson(path.join(projectPath, studioDir, 'project.json'), { name, testDir: 'tests', createdAt: new Date().toISOString() });
+  await fs.writeFile(path.join(projectPath, 'package.json'), JSON.stringify({ name: projectPath.split(path.sep).pop(), private: true, scripts: { test: 'playwright test' }, devDependencies: { '@playwright/test': '^1.50.0' } }, null, 2) + '\n');
+  await fs.writeFile(path.join(projectPath, 'playwright.config.ts'), "import { defineConfig } from '@playwright/test';\nexport default defineConfig({ testDir: './tests', use: { trace: 'retain-on-failure', screenshot: 'only-on-failure' } });\n");
+  return projectPath;
+}
+
 ipcMain.handle('select-project', async () => {
-  const result = await dialog.showOpenDialog({ defaultPath: defaultProjectPath, properties: ['openDirectory'] });
+  const result = await dialog.showOpenDialog({
+    title: 'Open Playwright project',
+    buttonLabel: 'Open project',
+    defaultPath: defaultProjectPath,
+    properties: ['openDirectory']
+  });
   return result.canceled ? null : result.filePaths[0];
 });
 
@@ -39,11 +53,24 @@ ipcMain.handle('open-default-project', async () => {
 
 ipcMain.handle('create-project', async (_event, name, location) => {
   const projectPath = path.join(location, name.replace(/[^a-z0-9-_]/gi, '-').toLowerCase());
-  await fs.mkdir(path.join(projectPath, studioDir, 'tests'), { recursive: true });
-  await writeJson(path.join(projectPath, studioDir, 'project.json'), { name, testDir: 'tests', createdAt: new Date().toISOString() });
-  await fs.writeFile(path.join(projectPath, 'package.json'), JSON.stringify({ name: projectPath.split(path.sep).pop(), private: true, scripts: { test: 'playwright test' }, devDependencies: { '@playwright/test': '^1.50.0' } }, null, 2) + '\n');
-  await fs.writeFile(path.join(projectPath, 'playwright.config.ts'), "import { defineConfig } from '@playwright/test';\nexport default defineConfig({ testDir: './tests', use: { trace: 'retain-on-failure', screenshot: 'only-on-failure' } });\n");
-  return projectPath;
+  return createProjectAt(projectPath, name);
+});
+
+ipcMain.handle('create-project-dialog', async () => {
+  await fs.mkdir(path.dirname(defaultProjectPath), { recursive: true });
+  const result = await dialog.showSaveDialog({
+    title: 'Create new Playwright project',
+    buttonLabel: 'Create project',
+    defaultPath: defaultProjectPath
+  });
+  if (result.canceled || !result.filePath) return null;
+  try {
+    await fs.access(result.filePath);
+    return null;
+  } catch {
+    const name = path.basename(result.filePath);
+    return createProjectAt(result.filePath, name);
+  }
 });
 
 ipcMain.handle('read-project', async (_event, projectPath) => {
@@ -106,7 +133,8 @@ ipcMain.handle('open-project-folder', async (_event, projectPath) => {
   try {
     const stats = await fs.stat(projectPath);
     if (!stats.isDirectory()) return false;
-    return (await shell.openPath(projectPath)) === '';
+    shell.showItemInFolder(projectPath);
+    return true;
   } catch {
     return false;
   }

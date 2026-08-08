@@ -12,11 +12,11 @@ import { removeRedundantNavigationSteps } from './recorder-utils';
 import { getRecentTests } from './recent-tests';
 import { readRecentFiles, touchRecentFile, type RecentFile } from './recent-files';
 import { defaultEnvironments } from './environments';
-import { filterTests } from './test-organization';
+import { collectTestFolders, filterTests } from './test-organization';
 import { getStepGroup, matchesStepQuery, type StepGroup } from './step-organizer';
 import { createTemplateSteps, templateDefinitions, type TemplateId, type TemplateVariable } from './templates';
 import type { VariableMap } from './variables';
-import type { LocatorDiagnostic, LocatorType, ManagedTest, ProjectState, Step, StepType, TestCase } from './types';
+import type { LocatorDiagnostic, LocatorType, ManagedTest, ProjectState, Step, StepType } from './types';
 
 const newStep = (type: StepType): Step => ({ id: crypto.randomUUID(), type, selector: type === 'navigate' ? undefined : 'body', locatorType: 'css', url: type === 'navigate' ? 'https://example.com' : undefined, assertion: type === 'assert' ? 'visible' : undefined, value: type === 'wait' ? '500' : '' });
 const labels: Record<StepType, string> = { navigate: 'Navigate', click: 'Click', hover: 'Hover', focus: 'Focus', clear: 'Clear input', press: 'Press key', fill: 'Fill', select: 'Select option', check: 'Checkbox / radio', upload: 'Upload file', assert: 'Assertion', wait: 'Wait', screenshot: 'Screenshot' };
@@ -29,6 +29,7 @@ const themeKey = 'playwright-studio-theme';
 const pageAssertions = new Set<Step['assertion']>(['url', 'urlContains', 'title']);
 const valueAssertions = new Set<Step['assertion']>(['text', 'value', 'url', 'urlContains', 'attribute', 'count', 'title']);
 const formatLocation = (location: NonNullable<RunFailure['location']>) => `${location.file}${location.line === undefined ? '' : `:${location.line}`}${location.column === undefined ? '' : `:${location.column}`}`;
+type MotionKind = 'idle' | 'test-select' | 'step-add' | 'step-update' | 'step-reorder' | 'step-delete' | 'save-success' | 'feedback-error' | 'run-state' | 'recorder-state' | 'panel-reveal' | 'theme-switch';
 const stepError = (step: Step) => {
   if (step.type === 'navigate' && !step.url?.trim()) return 'URL is required';
   if (step.type === 'wait' && (!step.value?.trim() || Number(step.value) < 0 || Number.isNaN(Number(step.value)))) return 'Use a valid wait time';
@@ -61,8 +62,10 @@ function App() {
   const [copyMessage, setCopyMessage] = useState('');
   const [importMessage, setImportMessage] = useState('');
   const [testQuery, setTestQuery] = useState('');
+  const [suiteFilter, setSuiteFilter] = useState('');
   const [environmentName, setEnvironmentName] = useState('Project');
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
+  const [showRecent, setShowRecent] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [draftNotice, setDraftNotice] = useState<DraftEnvelope | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -70,6 +73,9 @@ function App() {
   const [templateVariables, setTemplateVariables] = useState<VariableMap>({});
   const [stepQuery, setStepQuery] = useState('');
   const [stepGroupFilter, setStepGroupFilter] = useState<'All' | StepGroup>('All');
+  const [motion, setMotion] = useState<{ kind: MotionKind; nonce: number; stepId?: string }>({ kind: 'idle', nonce: 0 });
+  const motionNonceRef = useRef(0);
+  const motionTimerRef = useRef<number | null>(null);
   const code = useMemo(() => generateCode(selected.name, selected.steps, selected.variables), [selected.name, selected.steps, selected.variables]);
   const previewCode = selected.readOnly ? selected.generatedCode : code;
   const isDirty = !selected.readOnly && (!state || code !== selected.generatedCode);
@@ -82,8 +88,18 @@ function App() {
   const canRecord = Boolean(window.studio) && (recorderState === 'idle' || recorderState === 'error') && !selected.readOnly && !recordUrlError;
   const projectContextAvailable = Boolean(state?.project.baseURL || state?.project.projects?.length);
   const selectedEnvironment = defaultEnvironments.find((environment) => environment.name === environmentName) || defaultEnvironments[0];
-  const visibleTests = state ? filterTests(state.tests, { query: testQuery }) : [];
+  const suiteOptions = collectTestFolders(state?.tests || []);
+  const visibleTests = state ? filterTests(state.tests, { query: testQuery, folder: suiteFilter || undefined }) : [];
   const recentTests = getRecentTests(visibleTests);
+  const testGroups = useMemo(() => {
+    const groups = new Map<string, ManagedTest[]>();
+    visibleTests.forEach((test) => {
+      const folder = test.folder?.trim() || 'Root';
+      groups.set(folder, [...(groups.get(folder) || []), test]);
+    });
+    return [...groups.entries()].map(([folder, tests]) => ({ folder, tests }));
+  }, [visibleTests]);
+  const recentCount = recentFiles.length + recentTests.length;
 
   const rememberRecentFile = (test: ManagedTest, projectPath: string | undefined) => {
     if (!projectPath || test.readOnly) return;
@@ -92,6 +108,20 @@ function App() {
   const selectedTemplate = templateDefinitions.find((template) => template.id === templateId);
   const missingTemplateVariables = selectedTemplate?.requiredVariables.filter((name) => !templateVariables[name]?.trim()) || [];
   const canApplyTemplate = Boolean(selectedTemplate && missingTemplateVariables.length === 0);
+
+  const triggerMotion = (kind: MotionKind, stepId?: string, duration = 720) => {
+    if (motionTimerRef.current !== null) window.clearTimeout(motionTimerRef.current);
+    const nonce = ++motionNonceRef.current;
+    setMotion({ kind, nonce, stepId });
+    motionTimerRef.current = window.setTimeout(() => {
+      setMotion({ kind: 'idle', nonce: ++motionNonceRef.current });
+      motionTimerRef.current = null;
+    }, duration);
+  };
+
+  useEffect(() => {
+    setSuiteFilter('');
+  }, [state?.projectPath]);
 
   useEffect(() => {
     setRecentFiles(readRecentFiles(window.localStorage));
@@ -130,6 +160,9 @@ function App() {
     });
     return () => { offEvent(); offError(); };
   }, []);
+  useEffect(() => () => {
+    if (motionTimerRef.current !== null) window.clearTimeout(motionTimerRef.current);
+  }, []);
   const saveDraftFor = (test: ManagedTest) => {
     try {
       saveDraft(window.localStorage, state?.projectPath || 'browser-local', test);
@@ -137,18 +170,24 @@ function App() {
       // Draft persistence is best effort and must never interrupt editing.
     }
   };
-  const commit = (next: ManagedTest) => {
+  const commit = (next: ManagedTest, motionKind: MotionKind = 'step-update', stepId?: string) => {
     historyRef.current.push(next);
     setSelected(next);
     setHistoryVersion((current) => current + 1);
     saveDraftFor(next);
+    triggerMotion(motionKind, stepId);
   };
-  const update = (next: Partial<TestCase>) => commit({ ...historyRef.current.current, ...next });
+  const update = (next: Partial<ManagedTest>) => {
+    const current = historyRef.current.current;
+    const motionKind = next.steps && next.steps.length < current.steps.length ? 'step-delete' : 'step-update';
+    commit({ ...current, ...next }, motionKind);
+  };
   const selectTest = (test: ManagedTest) => {
     historyRef.current.reset(test);
     setSelected(test);
     setTemplateId(null);
     setHistoryVersion((current) => current + 1);
+    triggerMotion('test-select');
     if (state?.tests.some((item) => item.id === test.id)) rememberRecentFile(test, state.projectPath);
   };
   const undo = () => {
@@ -157,6 +196,7 @@ function App() {
     setSelected(previous);
     setHistoryVersion((current) => current + 1);
     saveDraftFor(previous);
+    triggerMotion('step-update');
   };
   const redo = () => {
     const next = historyRef.current.redo();
@@ -164,6 +204,7 @@ function App() {
     setSelected(next);
     setHistoryVersion((current) => current + 1);
     saveDraftFor(next);
+    triggerMotion('step-update');
   };
   const restoreDraft = () => {
     if (!draftNotice) return;
@@ -177,7 +218,7 @@ function App() {
   };
 
   async function openProject() {
-    const path = await window.studio?.openDefaultProject(); if (!path) return;
+    const path = await window.studio?.selectProject(); if (!path) return;
     const loaded = await window.studio?.readProject(path); if (loaded) { setState(loaded); selectTest(loaded.tests.find((test) => !test.readOnly) || initialTest()); }
   }
   async function openRecentFile(file: RecentFile) {
@@ -197,8 +238,7 @@ function App() {
     if (!opened) setSaveMessage('Unable to open project folder.');
   }
   async function createProject() {
-    const location = await window.studio?.selectProject(); if (!location) return;
-    const path = await window.studio?.createProject('playwright-studio-project', location); if (path) { const loaded = await window.studio?.readProject(path); if (loaded) { setState(loaded); selectTest(initialTest()); } }
+    const path = await window.studio?.createProjectDialog(); if (path) { const loaded = await window.studio?.readProject(path); if (loaded) { setState(loaded); selectTest(initialTest()); } }
   }
   async function save() {
     if (!canSave || selected.readOnly) return;
@@ -218,6 +258,7 @@ function App() {
     setHistoryVersion((current) => current + 1);
     try { clearDraft(window.localStorage); } catch { /* Ignore unavailable storage. */ }
     setSaveMessage('Test saved successfully.');
+    triggerMotion('save-success');
     window.setTimeout(() => setSaveMessage(''), 2500);
   }
   async function renameSelected() {
@@ -227,9 +268,9 @@ function App() {
     try {
       const renamed = await window.studio.renameTest(state.projectPath, selected.id, name);
       const next = { ...state, tests: state.tests.map((test) => test.id === renamed.id ? { ...test, ...renamed } : test) };
-      setState(next); setSelected({ ...selected, ...renamed }); setSaveMessage('Test renamed.');
+      setState(next); setSelected({ ...selected, ...renamed }); setSaveMessage('Test renamed.'); triggerMotion('save-success');
     } catch (error) {
-      setSaveMessage(error instanceof Error ? error.message : 'Unable to rename test.');
+      setSaveMessage(error instanceof Error ? error.message : 'Unable to rename test.'); triggerMotion('feedback-error');
     }
   }
   async function deleteSelected() {
@@ -238,16 +279,16 @@ function App() {
     try {
       await window.studio.deleteTest(state.projectPath, selected.id);
       const next = { ...state, tests: state.tests.filter((test) => test.id !== selected.id) };
-      setState(next); setSelected(next.tests.find((test) => !test.readOnly) || initialTest()); setSaveMessage('Test deleted.');
+      setState(next); setSelected(next.tests.find((test) => !test.readOnly) || initialTest()); setSaveMessage('Test deleted.'); triggerMotion('step-delete');
     } catch (error) {
-      setSaveMessage(error instanceof Error ? error.message : 'Unable to delete test.');
+      setSaveMessage(error instanceof Error ? error.message : 'Unable to delete test.'); triggerMotion('feedback-error');
     }
   }
   async function exportCode() {
     const safeName = selected.name.trim().toLowerCase().replace(/[^a-z0-9-_]+/gi, '-').replace(/^-|-$/g, '') || 'playwright-test';
     if (window.studio) {
       const exported = await window.studio.exportCode(safeName, previewCode);
-      if (exported) setSaveMessage('TypeScript file exported.');
+      if (exported) { setSaveMessage('TypeScript file exported.'); triggerMotion('save-success'); }
       return;
     }
     const blob = new Blob([previewCode], { type: 'text/typescript;charset=utf-8' });
@@ -256,15 +297,18 @@ function App() {
     link.href = url; link.download = `${safeName}.spec.ts`; link.click();
     URL.revokeObjectURL(url);
     setSaveMessage('TypeScript file downloaded.');
+    triggerMotion('save-success');
     window.setTimeout(() => setSaveMessage(''), 2500);
   }
   async function copyCode() {
     try {
       await navigator.clipboard.writeText(previewCode);
       setCopyMessage('Copied');
+      triggerMotion('save-success', undefined, 520);
       window.setTimeout(() => setCopyMessage(''), 1600);
     } catch {
       setCopyMessage('Copy unavailable');
+      triggerMotion('feedback-error');
     }
   }
   async function importFile(file: File | undefined) {
@@ -272,17 +316,20 @@ function App() {
     const imported = importSpec(await file.text());
     if (!imported.steps.length) {
       setImportMessage('No supported Playwright steps found.');
+      triggerMotion('feedback-error');
       return;
     }
     if (selected.steps.length && !window.confirm('Replace the current steps with the imported steps?')) return;
-    commit({ ...historyRef.current.current, steps: imported.steps });
+    commit({ ...historyRef.current.current, steps: imported.steps }, 'step-add');
     setImportMessage(`${imported.steps.length} steps imported${imported.warnings.length ? `, ${imported.warnings.length} warning${imported.warnings.length === 1 ? '' : 's'}` : ''}.`);
+    triggerMotion('save-success');
   }
   async function runTest() {
     if (!window.studio || !canRun({ readOnly: Boolean(selected.readOnly), hasErrors: !canSave, hasStudio: true, status: runStatus })) return;
     const runId = ++runIdRef.current;
     stoppedRunIdRef.current = null;
     setRunStatus('queued');
+    triggerMotion('run-state');
     setRunResult(null);
     setRunMessage('');
     try {
@@ -297,10 +344,12 @@ function App() {
       }
       setRunResult(result);
       setRunStatus(result.status);
+      triggerMotion('run-state');
     } catch (error) {
       if (runId !== runIdRef.current || stoppedRunIdRef.current === runId) return;
       setRunStatus('failed');
       setRunMessage(error instanceof Error ? error.message : 'Unable to run test.');
+      triggerMotion('feedback-error');
     }
   }
   async function stopTest() {
@@ -308,24 +357,25 @@ function App() {
     stoppedRunIdRef.current = runIdRef.current;
     setRunStatus('stopped');
     setRunMessage('Run stopped.');
+    triggerMotion('run-state');
     await window.studio.stopTest();
   }
   async function startRecording() {
     if (!window.studio || recordUrlError) return;
-    setRecordedSteps([]); setRecorderMessage(''); setRecorderState('recording');
+    setRecordedSteps([]); setRecorderMessage(''); setRecorderState('recording'); triggerMotion('recorder-state');
     const result = await window.studio.startRecorder(recordUrl.trim());
-    if (!result.ok) { setRecorderState('idle'); setRecorderMessage('Unable to start recorder. Check the URL and try again.'); return; }
+    if (!result.ok) { setRecorderState('idle'); setRecorderMessage('Unable to start recorder. Check the URL and try again.'); triggerMotion('feedback-error'); return; }
     if (selected.name.trim().toLowerCase() === 'untitled test') update({ name: suggestTestName(recordUrl) });
   }
   async function stopRecording() {
     if (!window.studio) return;
-    setRecorderState('stopping');
+    setRecorderState('stopping'); triggerMotion('recorder-state');
     const result = await window.studio.stopRecorder();
-    if (!result.ok) { setRecorderMessage('Recorder session is no longer active.'); setRecorderState('error'); return; }
+    if (!result.ok) { setRecorderMessage('Recorder session is no longer active.'); setRecorderState('error'); triggerMotion('feedback-error'); return; }
     const captured = removeRedundantNavigationSteps(recordedSteps);
     commit({ ...historyRef.current.current, steps: [...historyRef.current.current.steps, ...captured] });
     const actionSummary = captured.map((step) => labels[step.type]).join(', ');
-    setRecordedSteps([]); setRecorderMessage(captured.length ? `${captured.length} step${captured.length === 1 ? '' : 's'} captured: ${actionSummary}` : 'Recording stopped. No steps captured.'); setRecorderState('idle');
+    setRecordedSteps([]); setRecorderMessage(captured.length ? `${captured.length} step${captured.length === 1 ? '' : 's'} captured: ${actionSummary}` : 'Recording stopped. No steps captured.'); setRecorderState('idle'); triggerMotion(captured.length ? 'step-add' : 'recorder-state');
   }
   function chooseTemplate(nextTemplateId: TemplateId) {
     const definition = templateDefinitions.find((template) => template.id === nextTemplateId);
@@ -336,27 +386,37 @@ function App() {
     }, {});
     setTemplateId(nextTemplateId);
     setTemplateVariables(currentVariables);
+    triggerMotion('panel-reveal');
   }
   function applyTemplate() {
     if (!selectedTemplate || !canApplyTemplate) return;
     if (isDirty && selected.steps.length && !window.confirm('Replace unsaved steps with this template?')) return;
-    commit({ ...historyRef.current.current, steps: createTemplateSteps(selectedTemplate.id, templateVariables), variables: templateVariables });
+    commit({ ...historyRef.current.current, steps: createTemplateSteps(selectedTemplate.id, templateVariables), variables: templateVariables }, 'step-add');
     setTemplateId(null);
     setShowTemplates(false);
     setSaveMessage('Template added.');
+    triggerMotion('save-success');
   }
-  const addStep = (type: StepType) => update({ steps: [...historyRef.current.current.steps, newStep(type)] });
-  const setStep = (id: string, patch: Partial<Step>) => update({ steps: historyRef.current.current.steps.map((step) => step.id === id ? { ...step, ...patch } : step) });
+  const addStep = (type: StepType) => {
+    const step = newStep(type);
+    commit({ ...historyRef.current.current, steps: [...historyRef.current.current.steps, step] }, 'step-add', step.id);
+  };
+  const setStep = (id: string, patch: Partial<Step>) => commit({ ...historyRef.current.current, steps: historyRef.current.current.steps.map((step) => step.id === id ? { ...step, ...patch } : step) }, 'step-update', id);
   const moveStep = (index: number, direction: -1 | 1) => {
     const target = index + direction;
     const currentSteps = historyRef.current.current.steps;
     if (target < 0 || target >= currentSteps.length) return;
-    const steps = [...currentSteps]; [steps[index], steps[target]] = [steps[target], steps[index]]; update({ steps });
+    const steps = [...currentSteps]; [steps[index], steps[target]] = [steps[target], steps[index]]; commit({ ...historyRef.current.current, steps }, 'step-reorder', steps[target].id);
   };
   const duplicateStep = (index: number) => {
     const currentSteps = historyRef.current.current.steps;
     const copy = { ...currentSteps[index], id: crypto.randomUUID() };
-    update({ steps: [...currentSteps.slice(0, index + 1), copy, ...currentSteps.slice(index + 1)] });
+    commit({ ...historyRef.current.current, steps: [...currentSteps.slice(0, index + 1), copy, ...currentSteps.slice(index + 1)] }, 'step-add', copy.id);
+  };
+  const toggleTemplates = () => {
+    setShowTemplates((current) => !current);
+    setTemplateId(null);
+    triggerMotion('panel-reveal');
   };
 
   useEffect(() => {
@@ -384,16 +444,16 @@ function App() {
     return () => window.removeEventListener('keydown', onShortcut);
   }, [canRecord, canSave, selected.readOnly, recordUrl, recorderState, selected.name, selected.steps, state, historyVersion]);
 
-  return <div className="app-shell">
-    <header className="topbar"><div className="brand"><span className="brand-mark">PW</span><div><strong>Playwright Studio</strong><small>Visual test builder</small></div></div><div className="top-actions"><button onClick={createProject}>New project</button><button onClick={openProject}>Open project</button><button onClick={openFolder} disabled={!state || !window.studio}>Open folder</button>{state && <><span className="project-pill">{state.project.name}</span><span className={`context-pill ${projectContextAvailable ? '' : 'unavailable'}`}>{state.project.baseURL || 'context unavailable'}</span></>}<button className="theme-toggle" onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>{theme === 'dark' ? '☼ Light' : '◐ Dark'}</button></div></header>
+  return <div className="app-shell" data-motion={motion.kind} data-motion-nonce={motion.nonce}>
+    <header className="topbar"><div className="brand"><span className="brand-mark">PW</span><div><strong>Playwright Studio</strong><small>Visual test builder</small></div></div><div className="top-actions"><button className="primary" onClick={() => { triggerMotion('panel-reveal'); void createProject(); }}>New project</button><button onClick={() => { triggerMotion('panel-reveal'); void openProject(); }}>Open project</button>{state && <><span className="project-pill">{state.project.name}</span><button className="folder-action" onClick={() => { triggerMotion('panel-reveal'); void openFolder(); }} disabled={!window.studio} aria-label="Reveal in Finder" title="Reveal in Finder">↗</button><span className={`context-pill ${projectContextAvailable ? '' : 'unavailable'}`}>{state.project.baseURL || 'context unavailable'}</span></>}<button className="theme-toggle" onClick={() => { setTheme((current) => current === 'dark' ? 'light' : 'dark'); triggerMotion('theme-switch'); }} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>{theme === 'dark' ? '☼ Light' : '◐ Dark'}</button></div></header>
     <main className="workspace">
-      <aside className="sidebar"><div className="eyebrow">PROJECT EXPLORER</div>{recentFiles.length > 0 && <><div className="tree-section global-recent-section">▾ recent files</div>{recentFiles.map((file) => <button className={`tree-test recent-test ${state?.projectPath === file.projectPath && selected.id === file.testId ? 'active' : ''}`} key={`${file.projectPath}:${file.testId}`} onClick={() => void openRecentFile(file)}>◷ {file.name}<small className="recent-file-project">{file.projectPath}</small></button>)}</>}{state ? <><div className="tree-root">▾ {state.project.name}</div><div className="project-context"><div className="eyebrow">PROJECT CONTEXT</div><div className="context-row"><span>testDir</span><code>{state.project.testDir}</code></div>{state.project.baseURL && <div className="context-row"><span>baseURL</span><code title={state.project.baseURL}>{state.project.baseURL}</code></div>}{state.project.projects?.length ? <div className="context-row context-projects"><span>projects</span><div>{state.project.projects.map((project) => <code className="context-project" key={project}>{project}</code>)}</div></div> : null}{!projectContextAvailable && <small className="context-unavailable">Static project context unavailable.</small>}</div><label className="project-search"><span>Search tests</span><input value={testQuery} onChange={(event) => setTestQuery(event.target.value)} placeholder="Name, tag, folder" /></label>{recentTests.length > 0 && <><div className="tree-section recent-section">▾ recent tests</div>{recentTests.map((test) => <button className={`tree-test recent-test ${selected.id === test.id ? 'active' : ''}`} key={`recent-${test.id}`} onClick={() => selectTest(test)}>◷ {test.name}</button>)}</>}<div className="tree-section">▾ tests</div>{visibleTests.map((test) => <button className={`tree-test ${selected.id === test.id ? 'active' : ''}`} key={test.id} onClick={() => selectTest(test)}>◫ {test.name}{test.readOnly && <small className="readonly-tag">read-only</small>}</button>)}<button className="new-test" onClick={() => selectTest(initialTest())}>＋ New test</button></> : <div className="empty-side">Create or open a project to begin.</div>}</aside>
+      <aside className="sidebar"><div className="eyebrow">PROJECT EXPLORER</div>{recentCount > 0 && <><button className="tree-section tree-disclosure" aria-expanded={showRecent} onClick={() => setShowRecent((current) => !current)}><span>{showRecent ? '⌄' : '›'} Recent</span><small>{recentCount}</small></button>{showRecent && <div className="recent-list">{recentFiles.map((file) => <button className={`tree-test recent-test ${state?.projectPath === file.projectPath && selected.id === file.testId ? 'active' : ''}`} key={`${file.projectPath}:${file.testId}`} onClick={() => void openRecentFile(file)}><span className="tree-glyph">◷</span><span className="tree-test-copy"><span>{file.name}</span><small>{file.projectPath}</small></span></button>)}{recentTests.map((test) => <button className={`tree-test recent-test ${selected.id === test.id ? 'active' : ''}`} key={`recent-${test.id}`} onClick={() => selectTest(test)}><span className="tree-glyph">◷</span><span className="tree-test-copy"><span>{test.name}</span><small>recent test</small></span></button>)}</div>}</>}{state ? <><div className="tree-root"><span className="tree-glyph">⌄</span><span className="tree-root-copy"><strong>{state.project.name}</strong><small>{state.project.testDir}</small></span><span className={`context-dot ${projectContextAvailable ? 'available' : 'unavailable'}`} title={projectContextAvailable ? 'Project context available' : 'Static project context unavailable'} /></div><details className="project-context-details"><summary>Project details</summary><div className="project-context"><div className="context-row"><span>testDir</span><code>{state.project.testDir}</code></div>{state.project.baseURL && <div className="context-row"><span>baseURL</span><code title={state.project.baseURL}>{state.project.baseURL}</code></div>}{state.project.projects?.length ? <div className="context-row context-projects"><span>projects</span><div>{state.project.projects.map((project) => <code className="context-project" key={project}>{project}</code>)}</div></div> : null}{!projectContextAvailable && <small className="context-unavailable">Static project context unavailable.</small>}</div></details><div className="tree-section suites-heading"><span>Test suites</span><small>{suiteOptions.length}</small></div><div className="suite-list"><button className={`suite-filter ${!suiteFilter ? 'active' : ''}`} aria-pressed={!suiteFilter} onClick={() => setSuiteFilter('')}><span className="tree-glyph">▦</span><span>All tests</span><small>{state.tests.length}</small></button>{suiteOptions.map((suite) => <button className={`suite-filter ${suiteFilter === suite ? 'active' : ''}`} aria-pressed={suiteFilter === suite} key={suite} onClick={() => setSuiteFilter(suite)}><span className="tree-glyph">▾</span><span>{suite}</span><small>{state.tests.filter((test) => test.folder === suite).length}</small></button>)}</div><label className="project-search"><span>Search tests <small>{visibleTests.length}</small></span><input value={testQuery} onChange={(event) => setTestQuery(event.target.value)} placeholder="Name, tag, folder" /></label><div className="tree-section tests-heading"><span>Tests</span><small>{visibleTests.length}</small></div>{testGroups.length ? testGroups.map(({ folder, tests }) => <div className="test-group" key={folder}><div className="folder-heading"><span className="tree-glyph">⌄</span><span>{folder}</span><small>{tests.length}</small></div>{tests.map((test) => <button className={`tree-test ${selected.id === test.id ? 'active' : ''}`} key={test.id} onClick={() => selectTest(test)}><span className="tree-glyph">◫</span><span className="tree-test-copy"><span>{test.name}</span>{test.readOnly && <small className="readonly-inline">read-only</small>}</span></button>)}</div>) : <div className="empty-side search-empty">No tests found.</div>}<button className="new-test" onClick={() => selectTest(initialTest())}>＋ New test</button></> : <div className="empty-side">Create or open a project to begin.</div>}</aside>
       <section className="builder"><div className="section-head"><div><div className="eyebrow">TEST BUILDER</div><input className="test-title" value={selected.name} readOnly={selected.readOnly} onChange={(event) => update({ name: event.target.value })} /></div><div className="builder-actions">{!selected.readOnly && <><button className="ghost" onClick={undo} disabled={!historyRef.current.canUndo}>Undo</button><button className="ghost" onClick={redo} disabled={!historyRef.current.canRedo}>Redo</button><button className="ghost" onClick={renameSelected} disabled={!state || !window.studio}>Rename</button><button className="ghost danger-action" onClick={deleteSelected} disabled={!state || !window.studio}>Delete</button><button className="ghost" onClick={() => update({ steps: [] })}>Clear</button><button className="primary" onClick={save} disabled={!canSave}>Save test</button></>}</div></div>
         {!selected.readOnly && <div className="recorder-bar"><div><div className="eyebrow">BROWSER RECORDER</div><small className={!window.studio ? 'browser-mode-message' : undefined}>{!window.studio ? 'Recorder requires Playwright Studio Desktop.' : recorderState === 'recording' ? `${recordedSteps.length} steps captured` : recorderState === 'stopping' ? 'Finishing recording…' : 'Record actions from a controlled Chromium window'}</small></div>{recorderState === 'recording' || recorderState === 'stopping' ? <button className="stop-record" onClick={stopRecording} disabled={recorderState === 'stopping'}>■ Stop recording</button> : <div className="record-start"><div><input value={recordUrl} onChange={(event) => setRecordUrl(event.target.value)} placeholder="https://example.com" aria-invalid={Boolean(recordUrl && recordUrlError)} aria-describedby="record-url-help" /><small id="record-url-help">{recordUrlError || 'Enter the starting URL for Chromium.'}</small></div><button className="record" onClick={startRecording} disabled={!canRecord}>● Record</button></div>}</div>}
         {recorderMessage && <div className={`recorder-message ${recorderState === 'error' ? 'error' : ''}`}>{recorderMessage}</div>}
         {saveMessage && <div className="recorder-message">{saveMessage}</div>}
         {importMessage && <div className="recorder-message">{importMessage}</div>}
-        <div className="environment-bar"><label><span>Environment</span><select value={environmentName} onChange={(event) => setEnvironmentName(event.target.value)}>{defaultEnvironments.map((environment) => <option key={environment.name} value={environment.name}>{environment.name}</option>)}</select></label><small>{selectedEnvironment.baseURL || state?.project.baseURL || 'Uses project configuration'}</small></div>
+        <div className="environment-bar"><label><span>Environment</span><select value={environmentName} onChange={(event) => setEnvironmentName(event.target.value)}>{defaultEnvironments.map((environment) => <option key={environment.name} value={environment.name}>{environment.name}</option>)}</select></label><label><span>Test suite</span><select value={selected.folder || ''} disabled={selected.readOnly} onChange={(event) => { const value = event.target.value; if (value === '__new__') { const name = window.prompt('New test suite')?.trim(); if (name) update({ folder: name }); } else update({ folder: value || undefined }); }}><option value="">No suite</option>{suiteOptions.map((suite) => <option key={suite} value={suite}>{suite}</option>)}<option value="__new__">＋ New suite…</option></select></label><small>{selectedEnvironment.baseURL || state?.project.baseURL || 'Uses project configuration'}</small></div>
         <RunPanel status={runStatus} result={runResult} message={runMessage} available={Boolean(window.studio)} headed={runHeaded} onHeadedChange={setRunHeaded} onRun={() => void runTest()} onStop={() => void stopTest()} />
         {draftNotice && <div className="recorder-message"><span>Unsaved draft from {new Date(draftNotice.savedAt).toLocaleString()}.</span><button onClick={restoreDraft}>Restore draft</button><button onClick={discardDraft}>Discard</button></div>}
         {selected.readOnly ? <div className="readonly-preview">Open the source file in VS Code to edit this test.</div> : <><div className="step-filters"><label className="filter-search"><span>Search steps</span><input value={stepQuery} onChange={(event) => setStepQuery(event.target.value)} placeholder="Type, locator, value…" /></label><label className="filter-group"><span>Group</span><select value={stepGroupFilter} onChange={(event) => setStepGroupFilter(event.target.value as 'All' | StepGroup)}>{stepGroups.map((group) => <option key={group} value={group}>{group === 'All' ? 'All groups' : group}</option>)}</select></label></div><div className="steps-list">{selected.steps.length ? (visibleSteps.length ? visibleSteps.map(({ step, index }) => <StepCard key={step.id} index={index} step={step} error={errors[index]} onChange={(patch) => setStep(step.id, patch)} onDelete={() => update({ steps: historyRef.current.current.steps.filter((item) => item.id !== step.id) })} onMove={moveStep} onDuplicate={duplicateStep} onApplyRecommendation={(patch) => setStep(step.id, patch)} />) : <div className="empty-steps filtered-empty">No steps match this search or group.</div>) : <div className="empty-steps">Add an action from the toolbar below or start with a template.</div>}</div><div className="action-toolbar"><span className="toolbar-label">ADD ACTION</span>{(Object.keys(labels) as StepType[]).map((type) => <button key={type} onClick={() => addStep(type)}>＋ {labels[type]}</button>)}<button onClick={() => { setShowTemplates((current) => !current); setTemplateId(null); }}>＋ Use template</button><label className="import-button">Import .spec.ts<input type="file" accept=".ts,.tsx" onChange={(event) => { void importFile(event.target.files?.[0]); event.currentTarget.value = ''; }} /></label></div>{showTemplates && <div className="template-picker"><div className="eyebrow">STARTER TEMPLATES</div>{templateDefinitions.map((template) => <button className={templateId === template.id ? 'selected' : ''} key={template.id} onClick={() => chooseTemplate(template.id)}><strong>{template.name}</strong><small>{template.description}</small></button>)}{selectedTemplate && <div className="template-config"><div><div className="eyebrow">CONFIGURE {selectedTemplate.name.toUpperCase()}</div><small>Required values become local test variables in the generated TypeScript.</small></div>{selectedTemplate.requiredVariables.map((name) => <label className="field" key={name}><span>{templateVariableLabels[name]}</span><input type={name === 'password' ? 'password' : 'text'} value={templateVariables[name] || ''} placeholder={name === 'baseUrl' ? 'https://app.example.com' : name === 'email' ? 'qa@example.com' : '••••••••'} aria-invalid={missingTemplateVariables.includes(name)} onChange={(event) => setTemplateVariables((current) => ({ ...current, [name]: event.target.value }))} /></label>)}{missingTemplateVariables.length > 0 && <div className="validation-note">{missingTemplateVariables.map((name) => templateVariableLabels[name]).join(', ')} {missingTemplateVariables.length === 1 ? 'is' : 'are'} required.</div>}<div className="template-config-actions"><button className="ghost" onClick={() => setTemplateId(null)}>Cancel</button><button className="primary" onClick={applyTemplate} disabled={!canApplyTemplate}>Apply template</button></div></div>}</div>}</>}
