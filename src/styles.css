@@ -122,6 +122,19 @@ button:active { transform: translateY(1px); }
 .run-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .run-status.running .run-dot, .run-status.queued .run-dot { animation: pulse 1s infinite ease-in-out; }
 .run-error { color: var(--danger); font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+.test-report { display: grid; gap: 10px; padding: 11px; border: 1px solid var(--line-strong); border-left: 2px solid var(--muted); border-radius: var(--radius); background: var(--surface); }
+.test-report.passed { border-left-color: var(--accent); }
+.test-report.failed { border-left-color: var(--danger); }
+.test-report.stopped { border-left-color: var(--warning); }
+.test-report-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px 12px; margin: 0; }
+.test-report-grid > div { min-width: 0; }
+.test-report-grid dt { color: var(--quiet); font: 800 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.test-report-grid dd { margin: 5px 0 0; overflow: hidden; color: var(--text); font: 700 10px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.test-report.failed .test-report-grid > div:nth-child(5) dd { color: var(--danger); }
+.test-report-file { grid-column: 1 / -1; }
+.test-report-message { margin: 0; font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.test-report-message.success { color: var(--accent); }
+.test-report-message.failure { color: var(--danger); }
 .run-details details { color: var(--muted); font-size: 10px; }
 .run-details summary { cursor: pointer; }
 .run-details pre { min-height: 0; max-height: 160px; margin-top: 8px; padding: 8px; overflow: auto; border: 1px solid var(--line); border-left: 0; background: #0a1012; color: var(--muted); font-size: 10px; line-height: 1.5; }
@@ -259,6 +272,7 @@ pre { min-height: 240px; margin: 0; padding-left: 14px; border-left: 1px solid v
 [data-theme="light"] .project-context,
 [data-theme="light"] .recorder-bar,
 [data-theme="light"] .run-panel,
+[data-theme="light"] .test-report,
 [data-theme="light"] .readonly-banner,
 [data-theme="light"] .readonly-preview,
 [data-theme="light"] .template-config { background: #f7faf7; }
