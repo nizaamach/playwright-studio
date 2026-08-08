@@ -83,11 +83,33 @@ test('normalizes failed test details in report order', () => {
   ]);
 });
 
+test('uses the most specific failed Playwright step title, message, and location', () => {
+  const result = normalizeRunResult({
+    status: 'failed',
+    suites: [{ specs: [{ file: 'tests/checkout.spec.ts', title: 'checkout flow', tests: [{ results: [{
+      errors: [{ message: 'Test failed inside a Playwright step', location: { file: 'tests/checkout.spec.ts', line: 10, column: 3 } }],
+      steps: [{
+        title: 'Complete checkout',
+        error: { message: 'Generic step wrapper', location: { file: 'tests/checkout.spec.ts', line: 11, column: 5 } },
+        steps: [{
+          title: 'Click Place order',
+          error: { message: 'Timeout 5000ms exceeded while clicking Place order', location: { file: 'tests/checkout.spec.ts', line: 12, column: 7 } }
+        }]
+      }]
+    }] }] }] }]
+  });
+  assert.deepEqual(result.report.failures, [{
+    title: 'Click Place order',
+    message: 'Timeout 5000ms exceeded while clicking Place order',
+    location: { file: 'tests/checkout.spec.ts', line: 12, column: 7 }
+  }]);
+});
+
 test('normalizes nested failure messages and ignores malformed errors', () => {
   const result = normalizeRunResult({
     status: 'failed',
     suites: [null, {}, { specs: [{ file: 'tests/a.spec.ts', tests: [
-      { results: [{ errors: [null, {}, { message: '  ', error: { message: 'Useful inner message' }, location: { file: '' } }, { message: '   ' }] }] },
+      { results: [{ errors: [null, {}, { message: 'Generic wrapper', error: { message: 'Useful inner message' }, location: { file: '' } }, { message: '   ' }] }] },
       { results: 'malformed' }
     ] }] }, { suites: [{ specs: [{ title: 'nested spec', tests: [{ title: '', results: [{ errors: [{ message: 'Nested failure' }] }] }] }] }] }]
   });

@@ -55,37 +55,59 @@ const testDataDeclaration = (variables: VariableMap) => {
   return `const testData = {\n${entries.join(',\n')}\n};`;
 };
 
+const stepTitle = (step: Step, testName: string) => {
+  const target = step.selector?.trim() || 'element';
+  switch (step.type) {
+    case 'navigate': return `Navigate to ${step.url?.trim() || 'page'}`;
+    case 'click': return `Click ${target}`;
+    case 'hover': return `Hover over ${target}`;
+    case 'focus': return `Focus ${target}`;
+    case 'clear': return `Clear ${target}`;
+    case 'press': return `Press ${step.value?.trim() || 'key'} on ${target}`;
+    case 'fill': return `Fill ${target}`;
+    case 'select': return `Select option in ${target}`;
+    case 'check': return `${step.options === 'uncheck' ? 'Uncheck' : 'Check'} ${target}`;
+    case 'upload': return `Upload file to ${target}`;
+    case 'assert': return `Assert ${step.assertion || 'visible'} on ${step.selector?.trim() || 'page'}`;
+    case 'wait': return `Wait ${Math.max(0, Number(step.timeout || step.value || 500))} ms`;
+    case 'screenshot': return `Take screenshot ${screenshotPath(step.value, `${testName}.png`)}`;
+  }
+};
+
 export function generateCode(name: string, steps: Step[], variables?: VariableMap) {
   const variableMap = variables && Object.keys(variables).length ? variables : undefined;
   const lines = steps.map((step) => {
     const target = locator(step);
-    switch (step.type) {
-      case 'navigate': return `  await page.goto(${valueExpression(step.url, variableMap)});`;
-      case 'click': return `  await ${target}.click();`;
-      case 'hover': return `  await ${target}.hover();`;
-      case 'focus': return `  await ${target}.focus();`;
-      case 'clear': return `  await ${target}.clear();`;
-      case 'press': return `  await ${target}.press(${valueExpression(step.value, variableMap)});`;
-      case 'fill': return `  await ${target}.fill(${valueExpression(step.value, variableMap)});`;
-      case 'select': return `  await ${target}.selectOption(${valueExpression(step.value, variableMap)});`;
-      case 'check': return `  await ${target}.${step.options === 'uncheck' ? 'uncheck' : 'check'}();`;
-      case 'upload': return `  await ${target}.setInputFiles(${valueExpression(step.value, variableMap)});`;
-      case 'wait': return `  await page.waitForTimeout(${Math.max(0, Number(step.timeout || step.value || 500))});`;
-      case 'screenshot': return `  await page.screenshot({ path: ${quote(screenshotPath(step.value, `${name}.png`))}, fullPage: true });`;
+    const statement = (() => {
+      switch (step.type) {
+      case 'navigate': return `await page.goto(${valueExpression(step.url, variableMap)});`;
+      case 'click': return `await ${target}.click();`;
+      case 'hover': return `await ${target}.hover();`;
+      case 'focus': return `await ${target}.focus();`;
+      case 'clear': return `await ${target}.clear();`;
+      case 'press': return `await ${target}.press(${valueExpression(step.value, variableMap)});`;
+      case 'fill': return `await ${target}.fill(${valueExpression(step.value, variableMap)});`;
+      case 'select': return `await ${target}.selectOption(${valueExpression(step.value, variableMap)});`;
+      case 'check': return `await ${target}.${step.options === 'uncheck' ? 'uncheck' : 'check'}();`;
+      case 'upload': return `await ${target}.setInputFiles(${valueExpression(step.value, variableMap)});`;
+      case 'wait': return `await page.waitForTimeout(${Math.max(0, Number(step.timeout || step.value || 500))});`;
+      case 'screenshot': return `await page.screenshot({ path: ${quote(screenshotPath(step.value, `${name}.png`))}, fullPage: true });`;
       case 'assert':
-        if (step.assertion === 'text') return `  await expect(${target}).toContainText(${valueExpression(step.value, variableMap)});`;
-        if (step.assertion === 'value') return `  await expect(${target}).toHaveValue(${valueExpression(step.value, variableMap)});`;
-        if (step.assertion === 'checked') return `  await expect(${target}).toBeChecked();`;
-        if (step.assertion === 'enabled') return `  await expect(${target}).toBeEnabled();`;
-        if (step.assertion === 'disabled') return `  await expect(${target}).toBeDisabled();`;
-        if (step.assertion === 'url') return `  await expect(page).toHaveURL(${valueExpression(step.value, variableMap)});`;
-        if (step.assertion === 'urlContains') return `  await expect(page).toHaveURL(new RegExp(${valueExpression(step.value, variableMap)}));`;
-        if (step.assertion === 'title') return `  await expect(page).toHaveTitle(${valueExpression(step.value, variableMap)});`;
-        if (step.assertion === 'attribute') return `  await expect(${target}).toHaveAttribute(${quote(step.options || 'aria-label')}, ${valueExpression(step.value, variableMap)});`;
-        if (step.assertion === 'count') return `  await expect(${target}).toHaveCount(${Math.max(0, Number(step.value || 0))});`;
-        return `  await expect(${target}).toBeVisible();`;
+        if (step.assertion === 'text') return `await expect(${target}).toContainText(${valueExpression(step.value, variableMap)});`;
+        if (step.assertion === 'value') return `await expect(${target}).toHaveValue(${valueExpression(step.value, variableMap)});`;
+        if (step.assertion === 'checked') return `await expect(${target}).toBeChecked();`;
+        if (step.assertion === 'enabled') return `await expect(${target}).toBeEnabled();`;
+        if (step.assertion === 'disabled') return `await expect(${target}).toBeDisabled();`;
+        if (step.assertion === 'url') return `await expect(page).toHaveURL(${valueExpression(step.value, variableMap)});`;
+        if (step.assertion === 'urlContains') return `await expect(page).toHaveURL(new RegExp(${valueExpression(step.value, variableMap)}));`;
+        if (step.assertion === 'title') return `await expect(page).toHaveTitle(${valueExpression(step.value, variableMap)});`;
+        if (step.assertion === 'attribute') return `await expect(${target}).toHaveAttribute(${quote(step.options || 'aria-label')}, ${valueExpression(step.value, variableMap)});`;
+        if (step.assertion === 'count') return `await expect(${target}).toHaveCount(${Math.max(0, Number(step.value || 0))});`;
+        return `await expect(${target}).toBeVisible();`;
       default: return '';
-    }
+      }
+    })();
+    return statement && `  await test.step(${quote(stepTitle(step, name))}, async () => {\n    ${statement}\n  });`;
   }).filter(Boolean);
   const data = variableMap ? `${testDataDeclaration(variableMap)}\n\n` : '';
   return `import { test, expect } from '@playwright/test';\n\n${data}test(${quote(name)}, async ({ page }) => {\n${lines.join('\n')}\n});\n`;

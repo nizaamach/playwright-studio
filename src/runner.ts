@@ -49,11 +49,17 @@ function errorMessage(value: unknown): string {
   return typeof value === 'string' ? value : typeof candidate?.message === 'string' ? candidate.message : '';
 }
 
-function failureMessage(value: unknown): string {
+function failureDetail(value: unknown): Pick<RunFailure, 'message' | 'location'> | undefined {
   const candidate = asRecord(value);
-  if (typeof candidate?.message === 'string' && candidate.message.trim()) return candidate.message;
-  const nested = asRecord(candidate?.error);
-  return typeof nested?.message === 'string' && nested.message.trim() ? nested.message : '';
+  if (!candidate) return undefined;
+  const errorLocation = location(candidate.location);
+  const nested = failureDetail(candidate.error);
+  if (nested) {
+    const nestedLocation = nested.location ?? errorLocation;
+    return { ...nested, ...(nestedLocation ? { location: nestedLocation } : {}) };
+  }
+  if (typeof candidate.message !== 'string' || !candidate.message.trim()) return undefined;
+  return { message: candidate.message, ...(errorLocation ? { location: errorLocation } : {}) };
 }
 
 function failureTitle(spec: Record<string, unknown>, test: Record<string, unknown>, file: string): string {
@@ -65,6 +71,25 @@ function failureTitle(spec: Record<string, unknown>, test: Record<string, unknow
   return 'Unknown step';
 }
 
+function stepFailures(steps: unknown, fallbackTitle: string): RunFailure[] {
+  if (!Array.isArray(steps)) return [];
+  const failures: RunFailure[] = [];
+  for (const value of steps) {
+    const step = asRecord(value);
+    if (!step) continue;
+    const nested = stepFailures(step.steps, fallbackTitle);
+    if (nested.length) {
+      failures.push(...nested);
+      continue;
+    }
+    const detail = failureDetail(step.error);
+    if (!detail) continue;
+    const title = typeof step.title === 'string' && step.title.trim() ? step.title : fallbackTitle;
+    failures.push({ title, ...detail });
+  }
+  return failures;
+}
+
 function specFailures(spec: Record<string, unknown>): RunFailure[] {
   const file = typeof spec.file === 'string' ? spec.file : '';
   if (!Array.isArray(spec.tests)) return [];
@@ -74,17 +99,17 @@ function specFailures(spec: Record<string, unknown>): RunFailure[] {
     if (!test || !Array.isArray(test.results)) continue;
     for (const resultValue of test.results) {
       const result = asRecord(resultValue);
-      if (!result || !Array.isArray(result.errors)) continue;
+      if (!result) continue;
+      const title = failureTitle(spec, test, file);
+      const steps = stepFailures(result.steps, title);
+      if (steps.length) {
+        failures.push(...steps);
+        continue;
+      }
+      if (!Array.isArray(result.errors)) continue;
       for (const errorValue of result.errors) {
-        const message = failureMessage(errorValue);
-        if (!message) continue;
-        const error = asRecord(errorValue);
-        const errorLocation = location(error?.location);
-        failures.push({
-          title: failureTitle(spec, test, file),
-          message,
-          ...(errorLocation ? { location: errorLocation } : {})
-        });
+        const detail = failureDetail(errorValue);
+        if (detail) failures.push({ title, ...detail });
       }
     }
   }

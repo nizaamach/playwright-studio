@@ -27,6 +27,17 @@ const steps = [
 test('generator produces valid Playwright statements for all MVP action types', () => {
   const output = generateCode('smoke flow', steps);
   for (const expected of ['page.goto', '.click()', '.getByTestId("submit").click()', "page.locator('xpath=' +", '//button[@type=', '.hover()', '.focus()', '.clear()', '.press("Enter")', '.fill(', '.selectOption(', '.check()', '.setInputFiles(', 'toContainText(', '.toBeEnabled()', '.toHaveCount(3)', '.toHaveAttribute("aria-label", "Email")', 'getByLabel("Email", { exact: true })', 'waitForTimeout(250)', 'page.screenshot']) assert.match(output, new RegExp(expected.replace(/[()[\].]/g, '\\$&')));
+  assert.equal(output.match(/await test\.step\(/g)?.length, steps.length);
+});
+test('generated actions have meaningful Playwright step titles', () => {
+  const output = generateCode('failure details', [
+    { id: 'navigate', type: 'navigate', url: 'https://example.com/checkout' },
+    { id: 'click', type: 'click', locatorType: 'role', role: 'button', selector: 'Place order' },
+    { id: 'assert', type: 'assert', selector: '.confirmation', assertion: 'text', value: 'Order confirmed' }
+  ]);
+  assert.match(output, /await test\.step\("Navigate to https:\/\/example\.com\/checkout", async \(\) => \{/);
+  assert.match(output, /await test\.step\("Click Place order", async \(\) => \{/);
+  assert.match(output, /await test\.step\("Assert text on \.confirmation", async \(\) => \{/);
 });
 test('generated output imports Playwright test and expect', () => { assert.match(generateCode('test', []), /import \{ test, expect \} from '@playwright\/test'/); });
 test('adds a supported extension to screenshot paths', () => {
