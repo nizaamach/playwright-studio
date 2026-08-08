@@ -32,6 +32,12 @@ test('generated output imports Playwright test and expect', () => { assert.match
 test('adds a supported extension to screenshot paths', () => {
   assert.match(generateCode('screenshots', [{ id: 'shot', type: 'screenshot', value: '/tmp/Screenshot' }]), /path: "\/tmp\/Screenshot\.png"/);
 });
+test('uses CSS locators for structural html and body targets', () => {
+  const output = generateCode('structure', [
+    { id: 'body', type: 'assert', locatorType: 'text', selector: 'body', assertion: 'text', value: 'Invalid email or password!' }
+  ]);
+  assert.match(output, /expect\(page\.locator\("body"\)\)\.toContainText/);
+});
 test('generates visibility and checked assertions', () => {
   const output = generateCode('assertions', [
     { id: 'a', type: 'assert', selector: '[data-ready]', locatorType: 'css', assertion: 'visible' },

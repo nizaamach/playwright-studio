@@ -6,12 +6,13 @@ const screenshotPath = (value: string | undefined, fallback: string) => {
   const path = value?.trim() || fallback;
   return /\.(png|jpe?g)$/i.test(path) ? path : `${path}.png`;
 };
+const structuralSelector = (value: string) => /^(html|body)$/i.test(value.trim());
 const locator = (step: Step) => {
   const value = quote(step.selector || '');
   switch (step.locatorType) {
     case 'role': return `page.getByRole(${quote(step.role || 'button')}, { name: ${value} })`;
     case 'xpath': return `page.locator('xpath=' + ${value})`;
-    case 'text': return `page.getByText(${value})`;
+    case 'text': return structuralSelector(step.selector || '') ? `page.locator(${value})` : `page.getByText(${value})`;
     case 'label': return `page.getByLabel(${value}, { exact: true })`;
     case 'testId': return `page.getByTestId(${value})`;
     case 'placeholder': return `page.getByPlaceholder(${value})`;
