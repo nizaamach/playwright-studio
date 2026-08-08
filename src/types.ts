@@ -1,5 +1,6 @@
 import type { VariableMap } from './variables';
 import type { StepGroup } from './step-organizer';
+import type { RunRequest, RunResult } from './runner';
 
 export type StepType = 'navigate' | 'click' | 'hover' | 'focus' | 'clear' | 'press' | 'fill' | 'select' | 'check' | 'upload' | 'assert' | 'wait' | 'screenshot';
 export type LocatorType = 'css' | 'xpath' | 'role' | 'text' | 'label' | 'testId' | 'placeholder';
@@ -36,6 +37,9 @@ declare global {
       renameTest(path: string, testId: string, name: string): Promise<ManagedTest>;
       deleteTest(path: string, testId: string): Promise<boolean>;
       exportCode(fileName: string, code: string): Promise<boolean>;
+      runTest(request: RunRequest): Promise<RunResult>;
+      stopTest(): Promise<{ ok: boolean }>;
+      openArtifact(path: string): Promise<boolean>;
       startRecorder(url: string): Promise<{ ok: boolean }>;
       stopRecorder(): Promise<{ ok: boolean }>;
       countLocator(locatorType: LocatorType, selector: string, role?: string): Promise<LocatorDiagnostic>;
