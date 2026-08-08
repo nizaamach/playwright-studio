@@ -133,6 +133,12 @@ button:active { transform: translateY(1px); }
 .test-report.failed .test-report-grid > div:nth-child(5) dd { color: var(--danger); }
 .test-report-file { grid-column: 1 / -1; }
 .test-report-file dd { overflow-wrap: anywhere; text-overflow: clip; white-space: normal; }
+.test-report-failures { display: grid; gap: 7px; min-width: 0; }
+.test-report-subhead { margin: 0; color: var(--danger); font: 800 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.test-report-failure { display: grid; gap: 4px; min-width: 0; padding: 8px 9px; border: 1px solid var(--line-strong); border-left: 2px solid var(--danger); border-radius: var(--radius); background: var(--surface-soft); color: var(--text); font: 10px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.test-report-failure strong { color: var(--danger); font-size: 10px; overflow-wrap: anywhere; }
+.test-report-failure p, .test-report-failure small { min-width: 0; margin: 0; overflow-wrap: anywhere; word-break: break-word; }
+.test-report-failure small { color: var(--muted); }
 .test-report-message { margin: 0; font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .test-report-message.success { color: var(--accent); }
 .test-report-message.failure { color: var(--danger); }
