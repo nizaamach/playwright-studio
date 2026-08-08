@@ -78,8 +78,8 @@ test('normalizes failed test details in report order', () => {
     ] }] }]
   });
   assert.deepEqual(result.report.failures, [
-    { title: 'valid credentials', message: 'Expected dashboard', location: { file: 'tests/login.spec.ts', line: 12, column: 5 } },
-    { title: 'invalid password', message: 'Expected error message' }
+    { title: 'login > valid credentials', message: 'Expected dashboard', location: { file: 'tests/login.spec.ts', line: 12, column: 5 } },
+    { title: 'login > invalid password', message: 'Expected error message' }
   ]);
 });
 
@@ -87,7 +87,7 @@ test('normalizes nested failure messages and ignores malformed errors', () => {
   const result = normalizeRunResult({
     status: 'failed',
     suites: [null, {}, { specs: [{ file: 'tests/a.spec.ts', tests: [
-      { results: [{ errors: [null, {}, { error: { message: 'Useful inner message' }, location: { file: '' } }, { message: '   ' }] }] },
+      { results: [{ errors: [null, {}, { message: '  ', error: { message: 'Useful inner message' }, location: { file: '' } }, { message: '   ' }] }] },
       { results: 'malformed' }
     ] }] }, { suites: [{ specs: [{ title: 'nested spec', tests: [{ title: '', results: [{ errors: [{ message: 'Nested failure' }] }] }] }] }] }]
   });
@@ -95,6 +95,18 @@ test('normalizes nested failure messages and ignores malformed errors', () => {
     { title: 'tests/a.spec.ts', message: 'Useful inner message' },
     { title: 'nested spec', message: 'Nested failure' }
   ]);
+  assert.equal(normalizeRunResult({ status: 'failed', error: { error: { message: 'inner' } } }).error, '');
+});
+
+test('preserves depth-first source order across nested and sibling suites', () => {
+  const result = normalizeRunResult({
+    status: 'failed',
+    suites: [{ suites: [
+      { specs: [{ title: 'nested', tests: [{ title: 'child', results: [{ errors: [{ message: 'nested failure' }] }] }] }] },
+      { specs: [{ title: 'sibling', tests: [{ title: 'test', results: [{ errors: [{ message: 'sibling failure' }] }] }] }] }
+    ] }]
+  });
+  assert.deepEqual(result.report.failures?.map(({ title }) => title), ['nested > child', 'sibling > test']);
 });
 
 test('does not expose failures for stopped runs', () => {

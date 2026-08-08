@@ -46,16 +46,22 @@ function location(value: unknown): RunReport['errorLocation'] {
 
 function errorMessage(value: unknown): string {
   const candidate = asRecord(value);
-  if (typeof value === 'string') return value;
-  if (typeof candidate?.message === 'string' && candidate.message) return candidate.message;
+  return typeof value === 'string' ? value : typeof candidate?.message === 'string' ? candidate.message : '';
+}
+
+function failureMessage(value: unknown): string {
+  const candidate = asRecord(value);
+  if (typeof candidate?.message === 'string' && candidate.message.trim()) return candidate.message;
   const nested = asRecord(candidate?.error);
-  return typeof nested?.message === 'string' ? nested.message : '';
+  return typeof nested?.message === 'string' && nested.message.trim() ? nested.message : '';
 }
 
 function failureTitle(spec: Record<string, unknown>, test: Record<string, unknown>, file: string): string {
-  for (const value of [test.title, spec.title, file]) {
-    if (typeof value === 'string' && value) return value;
-  }
+  const specTitle = typeof spec.title === 'string' && spec.title ? spec.title : '';
+  const testTitle = typeof test.title === 'string' && test.title ? test.title : '';
+  if (specTitle && testTitle) return `${specTitle} > ${testTitle}`;
+  if (testTitle || specTitle) return testTitle || specTitle;
+  if (file) return file;
   return 'Unknown step';
 }
 
@@ -70,8 +76,8 @@ function specFailures(spec: Record<string, unknown>): RunFailure[] {
       const result = asRecord(resultValue);
       if (!result || !Array.isArray(result.errors)) continue;
       for (const errorValue of result.errors) {
-        const message = errorMessage(errorValue);
-        if (!message.trim()) continue;
+        const message = failureMessage(errorValue);
+        if (!message) continue;
         const error = asRecord(errorValue);
         const errorLocation = location(error?.location);
         failures.push({
@@ -86,19 +92,21 @@ function specFailures(spec: Record<string, unknown>): RunFailure[] {
 }
 
 function suiteFailures(suites: unknown): RunFailure[] {
-  const pending = Array.isArray(suites) ? [...suites] : [];
   const failures: RunFailure[] = [];
-  while (pending.length) {
-    const suite = asRecord(pending.shift());
-    if (!suite) continue;
-    if (Array.isArray(suite.specs)) {
-      for (const specValue of suite.specs) {
-        const spec = asRecord(specValue);
-        if (spec) failures.push(...specFailures(spec));
+  function visit(values: unknown[]) {
+    for (const value of values) {
+      const suite = asRecord(value);
+      if (!suite) continue;
+      if (Array.isArray(suite.specs)) {
+        for (const specValue of suite.specs) {
+          const spec = asRecord(specValue);
+          if (spec) failures.push(...specFailures(spec));
+        }
       }
+      if (Array.isArray(suite.suites)) visit(suite.suites);
     }
-    if (Array.isArray(suite.suites)) pending.push(...suite.suites);
   }
+  if (Array.isArray(suites)) visit(suites);
   return failures;
 }
 
