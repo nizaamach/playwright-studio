@@ -158,6 +158,9 @@ input:focus, select:focus { border-color: var(--accent); }
 .toolbar-label { margin-right: 4px; color: var(--quiet); font: 800 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .14em; }
 .action-toolbar button { padding: 7px 9px; background: transparent; color: var(--muted); font-size: 10px; }
 .action-toolbar button:hover { color: var(--accent); background: var(--surface-soft); }
+.import-button { padding: 7px 9px; border: 1px dashed var(--line-strong); border-radius: var(--radius); color: var(--muted); cursor: pointer; font-size: 10px; }
+.import-button:hover { border-color: var(--accent); color: var(--accent); background: var(--surface-soft); }
+.import-button input { display: none; }
 .empty-steps { padding: 50px; border: 1px dashed var(--line-strong); border-radius: var(--radius); color: var(--quiet); text-align: center; font-size: 12px; }
 .template-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 12px; padding: 13px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface-raised); }
 .template-picker .eyebrow { grid-column: 1 / -1; margin-bottom: 3px; }
