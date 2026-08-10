@@ -474,12 +474,15 @@ button:hover { background: var(--surface-soft); }
   .code-panel { min-height: 320px; }
 }
 
-/* Cinematic interaction layer: transform/opacity only for motion, with explicit state feedback. */
+/* Kinetics-inspired interaction layer: transform/opacity only for motion, with explicit state feedback. */
 :root {
   --motion-fast: 160ms;
   --motion-base: 240ms;
-  --motion-cinematic: 460ms;
+  --motion-spring: 360ms;
+  --motion-settle: 420ms;
   --motion-ease: cubic-bezier(.22, 1, .36, 1);
+  --motion-spring-ease: cubic-bezier(.34, 1.18, .64, 1);
+  --motion-settle-ease: cubic-bezier(.16, 1, .3, 1);
 }
 
 .app-shell,
@@ -505,7 +508,7 @@ select,
 .run-headed-toggle,
 .template-picker > button,
 .locator-recommendation {
-  transition: background-color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease), opacity var(--motion-fast) var(--motion-ease), transform var(--motion-fast) var(--motion-ease);
+  transition: background-color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease), opacity var(--motion-fast) var(--motion-ease), transform var(--motion-fast) var(--motion-spring-ease);
 }
 
 button:active,
@@ -530,12 +533,12 @@ select:focus-visible,
 }
 
 .step-card {
-  animation: step-enter var(--motion-cinematic) var(--motion-ease) both;
+  animation: step-enter var(--motion-spring) var(--motion-spring-ease) both;
 }
 
 [data-motion="step-add"] .step-card:last-child,
 [data-motion="step-reorder"] .step-card {
-  animation: step-feedback var(--motion-cinematic) var(--motion-ease) both;
+  animation: step-feedback var(--motion-spring) var(--motion-spring-ease) both;
 }
 
 .step-card:focus-within {
@@ -544,7 +547,7 @@ select:focus-visible,
 }
 
 [data-motion="step-delete"] .steps-list {
-  animation: list-settle var(--motion-cinematic) var(--motion-ease) both;
+  animation: list-settle var(--motion-settle) var(--motion-settle-ease) both;
 }
 
 [data-motion="test-select"] .builder,
@@ -552,13 +555,13 @@ select:focus-visible,
 [data-motion="theme-switch"],
 [data-motion="recorder-state"] .recorder-bar,
 [data-motion="run-state"] .run-panel {
-  animation: surface-reveal var(--motion-cinematic) var(--motion-ease) both;
+  animation: surface-reveal var(--motion-settle) var(--motion-settle-ease) both;
 }
 
 [data-motion="save-success"] .recorder-message,
 [data-motion="save-success"] .code-head,
 [data-motion="feedback-error"] .recorder-message {
-  animation: feedback-pop var(--motion-cinematic) var(--motion-ease) both;
+  animation: feedback-pop var(--motion-spring) var(--motion-spring-ease) both;
 }
 
 .run-status.running .run-dot,
@@ -567,30 +570,31 @@ select:focus-visible,
 }
 
 @keyframes step-enter {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(8px) scale(.995); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes step-feedback {
-  0% { opacity: .68; transform: translateY(7px); }
-  55% { opacity: 1; transform: translateY(-2px); }
-  100% { opacity: 1; transform: translateY(0); }
+  0% { opacity: .74; transform: translateY(6px) scale(.995); }
+  58% { opacity: 1; transform: translateY(-1px) scale(1.002); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes surface-reveal {
-  from { opacity: .7; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: .78; transform: translateY(4px) scale(.998); }
+  58% { opacity: 1; transform: translateY(-1px) scale(1.001); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes feedback-pop {
-  0% { opacity: .35; transform: translateY(5px) scale(.99); }
-  60% { opacity: 1; transform: translateY(-1px) scale(1.005); }
+  0% { opacity: .35; transform: translateY(4px) scale(.985); }
+  60% { opacity: 1; transform: translateY(-1px) scale(1.006); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes list-settle {
   0% { opacity: .7; transform: translateX(4px); }
-  55% { opacity: 1; transform: translateX(-1px); }
+  58% { opacity: 1; transform: translateX(-1px); }
   100% { opacity: 1; transform: translateX(0); }
 }
 
